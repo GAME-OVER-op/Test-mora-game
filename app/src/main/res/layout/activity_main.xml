@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:background="#0A0A0A"
+    android:padding="12dp">
+
+    <!-- БЛОК ПРОИЗВОДИТЕЛЬНОСТИ -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingEnd="8dp">
+
+        <TextView
+            android:id="@+id/rootStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="\u2026"
+            android:textSize="12sp"
+            android:layout_marginBottom="10dp" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <com.mora.gamedock.CircleGaugeView
+                android:id="@+id/cpuGauge"
+                android:layout_width="130dp"
+                android:layout_height="130dp" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:paddingHorizontal="18dp">
+
+                <TextView
+                    android:id="@+id/batteryText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--%"
+                    android:textColor="#FFFFFF"
+                    android:textSize="20sp"
+                    android:gravity="center" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="\u0411\u0430\u0442\u0430\u0440\u0435\u044f"
+                    android:textColor="#888888"
+                    android:textSize="11sp"
+                    android:gravity="center" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="12dp" />
+
+                <TextView
+                    android:id="@+id/tempText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--\u00b0C"
+                    android:textColor="#FFFFFF"
+                    android:textSize="20sp"
+                    android:gravity="center" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="\u0422\u0435\u043c\u043f."
+                    android:textColor="#888888"
+                    android:textSize="11sp"
+                    android:gravity="center" />
+            </LinearLayout>
+
+            <com.mora.gamedock.CircleGaugeView
+                android:id="@+id/gpuGauge"
+                android:layout_width="130dp"
+                android:layout_height="130dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/perfRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginTop="18dp" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:background="#222222" />
+
+    <!-- СЕТКА КАРТОЧЕК -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/tileGrid"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:paddingStart="10dp"
+        android:clipToPadding="false" />
+</LinearLayout>

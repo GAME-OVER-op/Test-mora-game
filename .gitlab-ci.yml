@@ -1,0 +1,30 @@
+image: gradle:8.7-jdk17
+
+variables:
+  ANDROID_SDK_ROOT: "${CI_PROJECT_DIR}/.android-sdk"
+  ANDROID_HOME: "${CI_PROJECT_DIR}/.android-sdk"
+  CMDLINE_TOOLS: "11076708"
+
+stages:
+  - build
+
+build_apk:
+  stage: build
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq wget unzip > /dev/null
+    - mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
+    - PROTO=https; HOST=dl.google.com
+    - wget -q "$PROTO://$HOST/android/repository/commandlinetools-linux-${CMDLINE_TOOLS}_latest.zip" -O /tmp/cmdtools.zip
+    - unzip -q /tmp/cmdtools.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
+    - mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+    - export PATH="$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools"
+    - yes | sdkmanager --licenses >/dev/null 2>&1 || true
+    - sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" >/dev/null
+    - echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+  script:
+    - gradle assembleDebug --no-daemon --stacktrace
+  artifacts:
+    name: "mora-gamedock-debug"
+    paths:
+      - app/build/outputs/apk/debug/app-debug.apk
+    expire_in: 4 weeks
