@@ -98,7 +98,6 @@ public class MainActivity extends AppCompatActivity {
         gpuFreq.setText(String.valueOf(Math.round(m.gpuFreqMhz)));
         cpuRing.setProgress((float) m.cpuFill);
         gpuRing.setProgress((float) m.gpuFill);
-        frame.setFills((float) m.cpuFill, (float) m.gpuFill);
         batteryText.setText(m.battery + "%");
         tempText.setText(String.format(Locale.US, "%.1f\u00b0C", m.tempC));
     }

@@ -11,9 +11,10 @@ import android.view.View;
 /**
  * Рамка GameSpace + боковые частотные рейки.
  *
- * Важно: на референсе это не одна угловая линия, а сегментированная панель:
- * [ данные  segmented ›    пустое поле    ‹ segmented  данные ]
- * Нижние сегменты заполняются ярким цветом пропорционально частоте CPU/GPU.
+ * Правильная логика по референсу:
+ * - это НЕ центральная V-линия;
+ * - это диагональный сегментированный край боковой панели данных;
+ * - сегменты заполняются снизу вверх по частоте CPU/GPU.
  */
 public class FrameBorderView extends View {
 
@@ -41,7 +42,6 @@ public class FrameBorderView extends View {
         frameGlow.setStyle(Paint.Style.STROKE);
         frameGlow.setStrokeJoin(Paint.Join.ROUND);
         frameGlow.setStrokeCap(Paint.Cap.ROUND);
-
         frameLine.setStyle(Paint.Style.STROKE);
         frameLine.setStrokeJoin(Paint.Join.ROUND);
         frameLine.setStrokeCap(Paint.Cap.ROUND);
@@ -50,7 +50,7 @@ public class FrameBorderView extends View {
         segOn.setStyle(Paint.Style.FILL);
         segOff.setStyle(Paint.Style.FILL);
         segStroke.setStyle(Paint.Style.STROKE);
-        segStroke.setStrokeWidth(0.8f * density);
+        segStroke.setStrokeWidth(0.75f * density);
 
         applyAccent();
     }
@@ -87,12 +87,12 @@ public class FrameBorderView extends View {
         frameGlow.setColor(withAlpha(accent, 145));
         frameLine.setColor(accent);
 
-        segGlow.setColor(withAlpha(accent, 120));
-        segGlow.setMaskFilter(new BlurMaskFilter(6f * density, BlurMaskFilter.Blur.NORMAL));
+        segGlow.setColor(withAlpha(accent, 90));
+        segGlow.setMaskFilter(new BlurMaskFilter(4.5f * density, BlurMaskFilter.Blur.NORMAL));
 
-        segOn.setColor(accent);
-        segOff.setColor(mixBlack(accent, 0.28f, 135));
-        segStroke.setColor(mixBlack(accent, 0.55f, 135));
+        segOn.setColor(withAlpha(accent, 235));
+        segOff.setColor(mixBlack(accent, 0.22f, 120));
+        segStroke.setColor(mixBlack(accent, 0.50f, 95));
     }
 
     private void buildFrame(float w, float h) {
@@ -120,58 +120,55 @@ public class FrameBorderView extends View {
         framePath.close();
     }
 
-    /** X координата внешней границы шеврона на заданной высоте. */
-    private static float xAt(float y, float baseX, float top, float mid, float bot, float depth) {
-        if (y <= mid) {
-            float t = (y - top) / Math.max(1f, mid - top);
-            return baseX + depth * t;
-        } else {
-            float t = (y - mid) / Math.max(1f, bot - mid);
-            return baseX + depth * (1f - t);
-        }
+    private static float lerp(float a, float b, float t) {
+        return a + (b - a) * t;
     }
 
     /**
-     * Рисует не линию, а сегментированную рейку-панель.
-     * left=true: данные слева, рейка смотрит вершиной вправо.
-     * left=false: данные справа, рейка смотрит вершиной влево.
+     * Диагональная рейка-край панели.
+     * left=true: левая панель, рейка идёт \ вниз вправо.
+     * left=false: правая панель, рейка зеркальная / вниз влево.
      */
-    private void drawSegmentRail(Canvas canvas, boolean left, float fill) {
+    private void drawSideRail(Canvas canvas, boolean left, float fill) {
         float w = getWidth(), h = getHeight();
 
-        // Геометрия подобрана под реф: вертикальная длинная рейка с вдавлением к центру на уровне частоты.
-        float top = h * 0.135f;
-        float bot = h * 0.875f;
-        float mid = h * 0.42f;
+        // Рейка должна быть рядом с блоком данных, не в пустом центре.
+        // На 1024px это примерно: левая 330→390, правая 694→634.
+        float top = h * 0.12f;
+        float bot = h * 0.89f;
+        float xTop = left ? w * 0.315f : w * 0.685f;
+        float xBot = left ? w * 0.382f : w * 0.618f;
 
-        float baseX = left ? w * 0.322f : w * 0.678f;
-        float depth = (left ? 1f : -1f) * Math.min(w * 0.034f, 40f * density);
-        float band = 18f * density;       // ширина панели между двумя линиями
+        // Ширина полосы меньше, чем в прошлом варианте — как узкий край панели.
+        float band = 15f * density;
         float innerShift = left ? band : -band;
 
-        int count = 19;
-        float gap = 3.0f * density;
-        float rawH = (bot - top) / count;
-        float fillThreshold = bot - fill * (bot - top);
+        int count = 21;
+        float gap = 2.2f * density;
+        float step = (bot - top) / count;
+        float threshold = bot - fill * (bot - top);
 
         for (int i = 0; i < count; i++) {
-            float y0 = top + i * rawH + gap * 0.55f;
-            float y1 = top + (i + 1) * rawH - gap * 0.55f;
+            float y0 = top + i * step + gap * 0.55f;
+            float y1 = top + (i + 1) * step - gap * 0.55f;
             if (y1 <= y0) continue;
 
-            float x0a = xAt(y0, baseX, top, mid, bot, depth);
-            float x1a = xAt(y1, baseX, top, mid, bot, depth);
-            float x0b = x0a + innerShift;
-            float x1b = x1a + innerShift;
+            float t0 = (y0 - top) / Math.max(1f, bot - top);
+            float t1 = (y1 - top) / Math.max(1f, bot - top);
+            float xa0 = lerp(xTop, xBot, t0);
+            float xa1 = lerp(xTop, xBot, t1);
+            float xb0 = xa0 + innerShift;
+            float xb1 = xa1 + innerShift;
 
+            // Отдельная трапеция-сегмент.
             segPath.reset();
-            segPath.moveTo(x0a, y0);
-            segPath.lineTo(x0b, y0);
-            segPath.lineTo(x1b, y1);
-            segPath.lineTo(x1a, y1);
+            segPath.moveTo(xa0, y0);
+            segPath.lineTo(xb0, y0);
+            segPath.lineTo(xb1, y1);
+            segPath.lineTo(xa1, y1);
             segPath.close();
 
-            boolean on = y1 >= fillThreshold; // снизу вверх
+            boolean on = y1 >= threshold; // fill снизу вверх
             if (on) {
                 canvas.drawPath(segPath, segGlow);
                 canvas.drawPath(segPath, segOn);
@@ -187,15 +184,14 @@ public class FrameBorderView extends View {
         float w = getWidth(), h = getHeight();
         buildFrame(w, h);
 
-        // Наружная рамка.
         frameGlow.setStrokeWidth(6f * density);
         frameGlow.setMaskFilter(new BlurMaskFilter(6f * density, BlurMaskFilter.Blur.NORMAL));
         canvas.drawPath(framePath, frameGlow);
+
         frameLine.setStrokeWidth(2f * density);
         canvas.drawPath(framePath, frameLine);
 
-        // Боковые сегментированные частотные панели.
-        drawSegmentRail(canvas, true, cpuFill);
-        drawSegmentRail(canvas, false, gpuFill);
+        drawSideRail(canvas, true, cpuFill);
+        drawSideRail(canvas, false, gpuFill);
     }
 }
