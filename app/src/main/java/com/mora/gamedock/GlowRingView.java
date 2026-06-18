@@ -9,85 +9,70 @@ import android.util.AttributeSet;
 import android.view.View;
 
 /**
- * Светящееся кольцо (в стиле RedMagic GameSpace CPU/GPU).
- * Цвет задаётся извне (зависит от режима). Прогресс 0..1 — яркая дуга поверх свечения.
+ * Светящийся объёмный «тор» CPU/GPU в стиле RedMagic.
  */
 public class GlowRingView extends View {
 
     private final Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint track = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint prog = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint inner = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
-
     private float progress = 0f;
-    private int accent = 0xFF2EA6FF;
+    private int accent = 0xFFFF2840;
+    private float density = 2f;
 
     public GlowRingView(Context c) { super(c); init(); }
     public GlowRingView(Context c, AttributeSet a) { super(c, a); init(); }
     public GlowRingView(Context c, AttributeSet a, int d) { super(c, a, d); init(); }
 
     private void init() {
-        // BlurMaskFilter не работает на hardware canvas — переводим вью в software-слой.
         setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-        glow.setStyle(Paint.Style.STROKE);
-        glow.setStrokeCap(Paint.Cap.ROUND);
-        track.setStyle(Paint.Style.STROKE);
-        track.setStrokeCap(Paint.Cap.ROUND);
-        prog.setStyle(Paint.Style.STROKE);
-        prog.setStrokeCap(Paint.Cap.ROUND);
-        inner.setStyle(Paint.Style.STROKE);
-        applyAccent();
+        density = getResources().getDisplayMetrics().density;
+        glow.setStyle(Paint.Style.STROKE); glow.setStrokeCap(Paint.Cap.ROUND);
+        p.setStyle(Paint.Style.STROKE); p.setStrokeCap(Paint.Cap.ROUND);
+        prog.setStyle(Paint.Style.STROKE); prog.setStrokeCap(Paint.Cap.ROUND);
     }
 
-    private static int withAlpha(int color, int alpha) {
-        return (color & 0x00FFFFFF) | (alpha << 24);
+    private static int withAlpha(int color, int a) { return (color & 0x00FFFFFF) | (a << 24); }
+    private static int mix(int color, float f) { // f<1 darken, f>1 lighten
+        int r = Math.min(255, (int) (((color >> 16) & 0xFF) * f));
+        int g = Math.min(255, (int) (((color >> 8) & 0xFF) * f));
+        int b = Math.min(255, (int) ((color & 0xFF) * f));
+        return 0xFF000000 | (r << 16) | (g << 8) | b;
     }
 
-    public void setAccent(int c) {
-        accent = c;
-        applyAccent();
-        invalidate();
-    }
-
-    private void applyAccent() {
-        glow.setColor(accent);
-        track.setColor(withAlpha(accent, 38));
-        prog.setColor(accent);
-        inner.setColor(withAlpha(0xFFFFFFFF, 120));
-    }
-
-    public void setProgress(float p) {
-        progress = Math.max(0f, Math.min(1f, p));
-        invalidate();
-    }
+    public void setAccent(int c) { accent = c; invalidate(); }
+    public void setProgress(float v) { progress = Math.max(0f, Math.min(1f, v)); invalidate(); }
 
     @Override
     protected void onDraw(Canvas canvas) {
         float w = getWidth(), h = getHeight();
         float size = Math.min(w, h);
-        float stroke = size * 0.11f;
-        float glowStroke = size * 0.14f;
-        float pad = glowStroke + size * 0.05f;
         float cx = w / 2f, cy = h / 2f;
-        float radius = size / 2f - pad;
-        rect.set(cx - radius, cy - radius, cx + radius, cy + radius);
+        float r = size / 2f - 12f * density;
+        rect.set(cx - r, cy - r, cx + r, cy + r);
 
-        // внешнее свечение (полное кольцо)
-        glow.setStrokeWidth(glowStroke);
-        glow.setMaskFilter(new BlurMaskFilter(size * 0.07f, BlurMaskFilter.Blur.NORMAL));
-        canvas.drawCircle(cx, cy, radius, glow);
+        // свечение
+        glow.setStrokeWidth(10f * density);
+        glow.setColor(withAlpha(accent, 170));
+        glow.setMaskFilter(new BlurMaskFilter(9f * density, BlurMaskFilter.Blur.NORMAL));
+        canvas.drawCircle(cx, cy, r, glow);
 
-        // тёмная дорожка
-        track.setStrokeWidth(stroke);
-        canvas.drawCircle(cx, cy, radius, track);
-
-        // яркая дуга прогресса
-        prog.setStrokeWidth(stroke);
+        // тень тора
+        p.setMaskFilter(null);
+        p.setStrokeWidth(9f * density); p.setColor(mix(accent, 0.45f));
+        canvas.drawCircle(cx, cy, r, p);
+        // яркое тело
+        p.setStrokeWidth(6f * density); p.setColor(accent);
+        canvas.drawCircle(cx, cy, r, p);
+        // блик
+        p.setStrokeWidth(2f * density); p.setColor(mix(accent, 1.6f));
+        canvas.drawCircle(cx, cy, r - 5f * density, p);
+        // внутренний обод
+        p.setStrokeWidth(2f * density); p.setColor(mix(accent, 0.5f));
+        canvas.drawCircle(cx, cy, r - 14f * density, p);
+        // дуга загрузки
+        prog.setStrokeWidth(4f * density); prog.setColor(mix(accent, 1.7f));
         canvas.drawArc(rect, -90f, 360f * progress, false, prog);
-
-        // внутренний тонкий блик
-        inner.setStrokeWidth(size * 0.012f);
-        canvas.drawCircle(cx, cy, radius - stroke * 0.62f, inner);
     }
 }

@@ -4,149 +4,148 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- УГЛОВАЯ РАМКА С НЕОНОМ -->
     <com.mora.gamedock.FrameBorderView
         android:id="@+id/frame"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- КОНТЕНТ -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="horizontal">
+        android:orientation="vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
 
-        <!-- ЛЕВЫЙ КЛАСТЕР: CPU -->
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center">
-
-            <TextView
-                android:id="@+id/cpuFreq"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="--"
-                android:textColor="#FFFFFF"
-                android:textSize="40sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="GHz"
-                android:textColor="#B9B8B8"
-                android:textSize="13sp"
-                android:layout_marginBottom="4dp" />
-
-            <com.mora.gamedock.GlowRingView
-                android:id="@+id/cpuRing"
-                android:layout_width="150dp"
-                android:layout_height="150dp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="CPU"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                android:letterSpacing="0.2"
-                android:layout_marginTop="6dp" />
-
-            <TextView
-                android:id="@+id/perfButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="\u0411\u0430\u043b\u0430\u043d\u0441"
-                android:textColor="#FFFFFF"
-                android:textSize="13sp"
-                android:paddingHorizontal="22dp"
-                android:paddingVertical="8dp"
-                android:layout_marginTop="16dp" />
-        </LinearLayout>
-
-        <!-- ЦЕНТР (пока пусто, потом — оверлей поверх игры) -->
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1.15"
-            android:orientation="vertical"
-            android:gravity="center_horizontal"
-            android:paddingTop="14dp">
-
-            <TextView
-                android:id="@+id/rootStatus"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="\u2026"
-                android:textSize="11sp" />
+        <!-- ===== ВЕРХНЯЯ ПАНЕЛЬ ===== -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="40dp">
 
             <LinearLayout
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="10dp">
-
-                <TextView
-                    android:id="@+id/batteryText"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="--%"
-                    android:textColor="#FFFFFF"
-                    android:textSize="15sp"
-                    android:paddingHorizontal="10dp" />
-
-                <TextView
-                    android:id="@+id/tempText"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="--\u00b0C"
-                    android:textColor="#FFFFFF"
-                    android:textSize="15sp"
-                    android:paddingHorizontal="10dp" />
+                android:layout_height="match_parent"
+                android:layout_gravity="start"
+                android:orientation="horizontal">
+                <View android:layout_width="34dp" android:layout_height="34dp" android:background="@drawable/square_btn" android:layout_marginEnd="8dp"/>
+                <View android:layout_width="34dp" android:layout_height="34dp" android:background="@drawable/square_btn" android:layout_marginEnd="8dp"/>
+                <View android:layout_width="34dp" android:layout_height="34dp" android:background="@drawable/square_btn" android:layout_marginEnd="8dp"/>
+                <View android:layout_width="34dp" android:layout_height="34dp" android:background="@drawable/square_btn"/>
             </LinearLayout>
-        </LinearLayout>
 
-        <!-- ПРАВЫЙ КЛАСТЕР: GPU -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_gravity="end"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <View android:layout_width="32dp" android:layout_height="32dp" android:background="@drawable/circle" android:backgroundTint="#46A0E8" android:layout_marginEnd="8dp"/>
+                <View android:layout_width="32dp" android:layout_height="32dp" android:background="@drawable/circle" android:backgroundTint="#3C5FCD" android:layout_marginEnd="8dp"/>
+                <View android:layout_width="32dp" android:layout_height="32dp" android:background="@drawable/circle" android:backgroundTint="#E1483C" android:layout_marginEnd="8dp"/>
+                <TextView android:layout_width="34dp" android:layout_height="34dp" android:background="@drawable/square_btn" android:gravity="center" android:text="\u2304" android:textColor="#FFFFFF" android:textSize="16sp"/>
+            </LinearLayout>
+        </FrameLayout>
+
+        <!-- ===== КОНТЕНТ ===== -->
         <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
             android:layout_weight="1"
-            android:orientation="vertical"
-            android:gravity="center">
+            android:orientation="horizontal"
+            android:paddingTop="6dp">
 
-            <TextView
-                android:id="@+id/gpuFreq"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="--"
-                android:textColor="#FFFFFF"
-                android:textSize="40sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="MHz"
-                android:textColor="#B9B8B8"
-                android:textSize="13sp"
-                android:layout_marginBottom="4dp" />
-
-            <com.mora.gamedock.GlowRingView
-                android:id="@+id/gpuRing"
+            <!-- ЛЕВАЯ ПАНЕЛЬ: карточки -->
+            <LinearLayout
                 android:layout_width="150dp"
-                android:layout_height="150dp" />
+                android:layout_height="match_parent"
+                android:orientation="vertical">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="GPU"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                android:letterSpacing="0.2"
-                android:layout_marginTop="6dp" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="34dp"
+                    android:background="@drawable/pill_bg"
+                    android:orientation="horizontal"
+                    android:padding="3dp">
+                    <TextView android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/pill_red" android:gravity="center" android:text="\u2630" android:textColor="#FFFFFF" android:textSize="14sp"/>
+                    <TextView android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:gravity="center" android:text="\u25a6" android:textColor="#9A9AA0" android:textSize="14sp"/>
+                </LinearLayout>
+
+                <LinearLayout android:layout_width="match_parent" android:layout_height="82dp" android:orientation="vertical" android:background="@drawable/card_bg_hi" android:padding="12dp" android:layout_marginTop="12dp">
+                    <View android:layout_width="30dp" android:layout_height="30dp" android:background="@drawable/ring_icon"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Superior Pic Qual" android:textColor="#FFFFFF" android:textSize="12sp" android:layout_marginTop="8dp"/>
+                </LinearLayout>
+
+                <LinearLayout android:layout_width="match_parent" android:layout_height="82dp" android:orientation="vertical" android:background="@drawable/card_bg" android:padding="12dp" android:layout_marginTop="10dp">
+                    <View android:layout_width="30dp" android:layout_height="30dp" android:background="@drawable/ring_icon"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Counter" android:textColor="#9A9AA0" android:textSize="12sp" android:layout_marginTop="8dp"/>
+                </LinearLayout>
+
+                <LinearLayout android:layout_width="match_parent" android:layout_height="82dp" android:orientation="vertical" android:background="@drawable/card_bg" android:padding="12dp" android:layout_marginTop="10dp">
+                    <View android:layout_width="30dp" android:layout_height="30dp" android:background="@drawable/ring_icon"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Somatosensac" android:textColor="#9A9AA0" android:textSize="12sp" android:layout_marginTop="8dp"/>
+                </LinearLayout>
+
+                <View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="REDMAGIC 10S Pro" android:textColor="#78787E" android:textSize="11sp" android:textStyle="bold"/>
+            </LinearLayout>
+
+            <!-- CPU КЛАСТЕР -->
+            <LinearLayout
+                android:layout_width="130dp"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:gravity="center">
+                <TextView android:id="@+id/cpuFreq" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="--" android:textColor="#FFFFFF" android:textSize="36sp" android:textStyle="bold"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="GHz" android:textColor="#9A9AA0" android:textSize="12sp" android:layout_marginBottom="6dp"/>
+                <com.mora.gamedock.GlowRingView android:id="@+id/cpuRing" android:layout_width="120dp" android:layout_height="120dp"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="CPU" android:textColor="#FF2840" android:textSize="14sp" android:textStyle="bold" android:letterSpacing="0.15" android:layout_marginTop="6dp"/>
+                <TextView android:id="@+id/perfButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Rise" android:textColor="#FFFFFF" android:textSize="13sp" android:paddingHorizontal="22dp" android:paddingVertical="7dp" android:layout_marginTop="12dp"/>
+            </LinearLayout>
+
+            <!-- ЦЕНТР (пока пусто — потом оверлей) -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:gravity="center_horizontal">
+                <TextView android:id="@+id/rootStatus" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="\u2026" android:textSize="11sp"/>
+                <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="6dp">
+                    <TextView android:id="@+id/batteryText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="--%" android:textColor="#FFFFFF" android:textSize="14sp" android:paddingHorizontal="8dp"/>
+                    <TextView android:id="@+id/tempText" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="--\u00b0C" android:textColor="#FFFFFF" android:textSize="14sp" android:paddingHorizontal="8dp"/>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- GPU КЛАСТЕР -->
+            <LinearLayout
+                android:layout_width="130dp"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:gravity="center">
+                <TextView android:id="@+id/gpuFreq" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="--" android:textColor="#FFFFFF" android:textSize="36sp" android:textStyle="bold"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="MHz" android:textColor="#9A9AA0" android:textSize="12sp" android:layout_marginBottom="6dp"/>
+                <com.mora.gamedock.GlowRingView android:id="@+id/gpuRing" android:layout_width="120dp" android:layout_height="120dp"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="GPU" android:textColor="#FF2840" android:textSize="14sp" android:textStyle="bold" android:letterSpacing="0.15" android:layout_marginTop="6dp"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Ordinary Noti" android:textColor="#FFFFFF" android:textSize="13sp" android:background="@drawable/card_bg" android:paddingHorizontal="16dp" android:paddingVertical="7dp" android:layout_marginTop="12dp"/>
+            </LinearLayout>
+
+            <!-- ПРАВАЯ ПАНЕЛЬ: сетка плиток -->
+            <GridLayout
+                android:layout_width="154dp"
+                android:layout_height="match_parent"
+                android:columnCount="2"
+                android:useDefaultMargins="false">
+                <LinearLayout android:layout_width="71dp" android:layout_height="54dp" android:layout_margin="3dp" android:orientation="vertical" android:gravity="center" android:background="@drawable/tile_bg"><View android:layout_width="22dp" android:layout_height="22dp" android:background="@drawable/ring_icon"/><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="WiFi" android:textColor="#9A9AA0" android:textSize="9sp" android:layout_marginTop="4dp"/></LinearLayout>
+                <LinearLayout android:layout_width="71dp" android:layout_height="54dp" android:layout_margin="3dp" android:orientation="vertical" android:gravity="center" android:background="@drawable/tile_bg"><View android:layout_width="22dp" android:layout_height="22dp" android:background="@drawable/ring_icon"/><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Active mode" android:textColor="#9A9AA0" android:textSize="9sp" android:layout_marginTop="4dp"/></LinearLayout>
+                <LinearLayout android:layout_width="71dp" android:layout_height="54dp" android:layout_margin="3dp" android:orientation="vertical" android:gravity="center" android:background="@drawable/tile_bg"><View android:layout_width="22dp" android:layout_height="22dp" android:background="@drawable/ring_icon"/><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Default" android:textColor="#9A9AA0" android:textSize="9sp" android:layout_marginTop="4dp"/></LinearLayout>
+                <LinearLayout android:layout_width="71dp" android:layout_height="54dp" android:layout_margin="3dp" android:orientation="vertical" android:gravity="center" android:background="@drawable/tile_bg"><View android:layout_width="22dp" android:layout_height="22dp" android:background="@drawable/ring_icon"/><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Info" android:textColor="#9A9AA0" android:textSize="9sp" android:layout_marginTop="4dp"/></LinearLayout>
+                <LinearLayout android:layout_width="71dp" android:layout_height="54dp" android:layout_margin="3dp" android:orientation="vertical" android:gravity="center" android:background="@drawable/tile_bg"><View android:layout_width="22dp" android:layout_height="22dp" android:background="@drawable/ring_icon"/><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="On-demand" android:textColor="#9A9AA0" android:textSize="9sp" android:layout_marginTop="4dp"/></LinearLayout>
+                <LinearLayout android:layout_width="71dp" android:layout_height="54dp" android:layout_margin="3dp" android:orientation="vertical" android:gravity="center" android:background="@drawable/tile_bg"><View android:layout_width="22dp" android:layout_height="22dp" android:background="@drawable/ring_icon"/><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Fan" android:textColor="#9A9AA0" android:textSize="9sp" android:layout_marginTop="4dp"/></LinearLayout>
+                <LinearLayout android:layout_width="71dp" android:layout_height="54dp" android:layout_margin="3dp" android:orientation="vertical" android:gravity="center" android:background="@drawable/tile_bg"><View android:layout_width="22dp" android:layout_height="22dp" android:background="@drawable/ring_icon"/><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Rotation Lock" android:textColor="#9A9AA0" android:textSize="9sp" android:layout_marginTop="4dp"/></LinearLayout>
+                <LinearLayout android:layout_width="71dp" android:layout_height="54dp" android:layout_margin="3dp" android:orientation="vertical" android:gravity="center" android:background="@drawable/tile_bg"><View android:layout_width="22dp" android:layout_height="22dp" android:background="@drawable/ring_icon"/><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Screen Rec" android:textColor="#9A9AA0" android:textSize="9sp" android:layout_marginTop="4dp"/></LinearLayout>
+                <LinearLayout android:layout_width="71dp" android:layout_height="54dp" android:layout_margin="3dp" android:orientation="vertical" android:gravity="center" android:background="@drawable/tile_bg"><View android:layout_width="22dp" android:layout_height="22dp" android:background="@drawable/ring_icon"/><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Touch" android:textColor="#9A9AA0" android:textSize="9sp" android:layout_marginTop="4dp"/></LinearLayout>
+                <LinearLayout android:layout_width="71dp" android:layout_height="54dp" android:layout_margin="3dp" android:orientation="vertical" android:gravity="center" android:background="@drawable/tile_bg"><View android:layout_width="22dp" android:layout_height="22dp" android:background="@drawable/ring_icon"/><TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Charge" android:textColor="#9A9AA0" android:textSize="9sp" android:layout_marginTop="4dp"/></LinearLayout>
+            </GridLayout>
         </LinearLayout>
     </LinearLayout>
 </FrameLayout>

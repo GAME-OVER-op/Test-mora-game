@@ -9,12 +9,11 @@ import android.util.AttributeSet;
 import android.view.View;
 
 /**
- * Угловатая «гексагональная» рамка GameSpace с тонким светящимся кантом.
- * Скошенные углы + трапециевидный вырез сверху по центру. Цвет — по режиму.
+ * Угловая рамка GameSpace: скошенные углы, плечи сверху и трапециевидный вырез по центру.
  */
 public class FrameBorderView extends View {
 
-    private int accent = 0xFFFF2D46;
+    private int accent = 0xFFFF2840;
     private final Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path path = new Path();
@@ -36,15 +35,9 @@ public class FrameBorderView extends View {
         applyAccent();
     }
 
-    private static int withAlpha(int color, int alpha) {
-        return (color & 0x00FFFFFF) | (alpha << 24);
-    }
+    private static int withAlpha(int color, int alpha) { return (color & 0x00FFFFFF) | (alpha << 24); }
 
-    public void setAccent(int c) {
-        accent = c;
-        applyAccent();
-        invalidate();
-    }
+    public void setAccent(int c) { accent = c; applyAccent(); invalidate(); }
 
     private void applyAccent() {
         glow.setColor(withAlpha(accent, 150));
@@ -52,24 +45,23 @@ public class FrameBorderView extends View {
     }
 
     private void buildPath(float w, float h) {
-        float in = 10f * density;   // отступ от края
-        float c = 26f * density;    // скос углов
-        float nd = 22f * density;   // глубина выреза сверху
-        float nL = w * 0.43f, nLb = w * 0.47f, nRb = w * 0.53f, nR = w * 0.57f;
-
+        float in = 9f * density, c = 16f * density, nd = 13f * density, sh = 9f * density;
+        float nL = w * 0.42f, nLb = w * 0.46f, nRb = w * 0.54f, nR = w * 0.58f;
         path.reset();
-        path.moveTo(in + c, in);
-        path.lineTo(nL, in);              // верх до выреза
-        path.lineTo(nLb, in + nd);         // вниз во вырез
-        path.lineTo(nRb, in + nd);         // дно выреза
-        path.lineTo(nR, in);               // вверх из выреза
-        path.lineTo(w - in - c, in);       // верх до правого скоса
-        path.lineTo(w - in, in + c);       // правый верхний скос
-        path.lineTo(w - in, h - in - c);   // правый бок
-        path.lineTo(w - in - c, h - in);   // правый нижний скос
-        path.lineTo(in + c, h - in);       // низ
-        path.lineTo(in, h - in - c);       // левый нижний скос
-        path.lineTo(in, in + c);           // левый бок
+        path.moveTo(in + c, in + sh);
+        path.lineTo(w * 0.20f, in);
+        path.lineTo(nL, in);
+        path.lineTo(nLb, in + nd);
+        path.lineTo(nRb, in + nd);
+        path.lineTo(nR, in);
+        path.lineTo(w * 0.80f, in);
+        path.lineTo(w - in - c, in + sh);
+        path.lineTo(w - in, in + c + sh);
+        path.lineTo(w - in, h - in - c);
+        path.lineTo(w - in - c, h - in);
+        path.lineTo(in + c, h - in);
+        path.lineTo(in, h - in - c);
+        path.lineTo(in, in + c + sh);
         path.close();
     }
 
