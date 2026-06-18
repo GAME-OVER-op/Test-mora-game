@@ -4,14 +4,9 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- КРЫЛЬЯ С LED -->
-    <com.mora.gamedock.WingView
-        android:id="@+id/wingLeft"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
-
-    <com.mora.gamedock.WingView
-        android:id="@+id/wingRight"
+    <!-- УГЛОВАЯ РАМКА С НЕОНОМ -->
+    <com.mora.gamedock.FrameBorderView
+        android:id="@+id/frame"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
@@ -48,8 +43,8 @@
 
             <com.mora.gamedock.GlowRingView
                 android:id="@+id/cpuRing"
-                android:layout_width="118dp"
-                android:layout_height="118dp" />
+                android:layout_width="150dp"
+                android:layout_height="150dp" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -141,8 +136,8 @@
 
             <com.mora.gamedock.GlowRingView
                 android:id="@+id/gpuRing"
-                android:layout_width="118dp"
-                android:layout_height="118dp" />
+                android:layout_width="150dp"
+                android:layout_height="150dp" />
 
             <TextView
                 android:layout_width="wrap_content"

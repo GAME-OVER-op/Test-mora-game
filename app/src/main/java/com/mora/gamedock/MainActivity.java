@@ -17,7 +17,7 @@ public class MainActivity extends AppCompatActivity {
     private volatile boolean running = true;
 
     private GlowRingView cpuRing, gpuRing;
-    private WingView wingLeft, wingRight;
+    private FrameBorderView frame;
     private TextView cpuFreq, gpuFreq, batteryText, tempText, rootStatus, perfButton;
 
     private long lastTotal = 0, lastIdle = 0;
@@ -25,7 +25,7 @@ public class MainActivity extends AppCompatActivity {
     // Режимы RedMagic и их цвета: Баланс (голубой), Подъём (жёлтый), За пределами (красный)
     private static final String[] MODE_NAMES = {"\u0411\u0430\u043b\u0430\u043d\u0441", "\u041f\u043e\u0434\u044a\u0451\u043c", "\u0417\u0430 \u043f\u0440\u0435\u0434\u0435\u043b\u0430\u043c\u0438"};
     private static final int[] MODE_COLORS = {0xFF2EA6FF, 0xFFFFC107, 0xFFFF2D46};
-    private int mode = 0;
+    private int mode = 2; // по умолчанию красный (как на скрине стока)
 
     // sysfs RedMagic (SD8Gen3 / Adreno 750)
     private static final String CPU0 = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq";
@@ -43,9 +43,7 @@ public class MainActivity extends AppCompatActivity {
 
         cpuRing = findViewById(R.id.cpuRing);
         gpuRing = findViewById(R.id.gpuRing);
-        wingLeft = findViewById(R.id.wingLeft);
-        wingRight = findViewById(R.id.wingRight);
-        wingRight.setMirror(true);
+        frame = findViewById(R.id.frame);
 
         cpuFreq = findViewById(R.id.cpuFreq);
         gpuFreq = findViewById(R.id.gpuFreq);
@@ -65,8 +63,7 @@ public class MainActivity extends AppCompatActivity {
         perfButton.setText(MODE_NAMES[m]);
         cpuRing.setAccent(accent);
         gpuRing.setAccent(accent);
-        wingLeft.setAccent(accent);
-        wingRight.setAccent(accent);
+        frame.setAccent(accent);
 
         float density = getResources().getDisplayMetrics().density;
         GradientDrawable bg = new GradientDrawable();
