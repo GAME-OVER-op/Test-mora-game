@@ -95,10 +95,10 @@
                 android:layout_height="match_parent"
                 android:orientation="vertical"
                 android:gravity="center">
-                <TextView android:id="@+id/cpuFreq" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="--" android:textColor="#FFFFFF" android:textSize="36sp" android:textStyle="bold"/>
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="GHz" android:textColor="#9A9AA0" android:textSize="12sp" android:layout_marginBottom="6dp"/>
-                <com.mora.gamedock.GlowRingView android:id="@+id/cpuRing" android:layout_width="120dp" android:layout_height="120dp"/>
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="CPU" android:textColor="#FF2840" android:textSize="14sp" android:textStyle="bold" android:letterSpacing="0.15" android:layout_marginTop="6dp"/>
+                <TextView android:id="@+id/cpuFreq" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="--" android:textColor="#FFFFFF" android:textSize="30sp" android:textStyle="bold"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="GHz" android:textColor="#9A9AA0" android:textSize="12sp" android:layout_marginBottom="0dp"/>
+                <com.mora.gamedock.GlowRingView android:id="@+id/cpuRing" android:layout_width="130dp" android:layout_height="96dp" android:layout_marginTop="-6dp"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="CPU" android:textColor="#FF2840" android:textSize="14sp" android:textStyle="bold" android:letterSpacing="0.15" android:layout_marginTop="-10dp"/>
                 <TextView android:id="@+id/perfButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Rise" android:textColor="#FFFFFF" android:textSize="13sp" android:paddingHorizontal="22dp" android:paddingVertical="7dp" android:layout_marginTop="12dp"/>
             </LinearLayout>
 
@@ -122,10 +122,10 @@
                 android:layout_height="match_parent"
                 android:orientation="vertical"
                 android:gravity="center">
-                <TextView android:id="@+id/gpuFreq" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="--" android:textColor="#FFFFFF" android:textSize="36sp" android:textStyle="bold"/>
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="MHz" android:textColor="#9A9AA0" android:textSize="12sp" android:layout_marginBottom="6dp"/>
-                <com.mora.gamedock.GlowRingView android:id="@+id/gpuRing" android:layout_width="120dp" android:layout_height="120dp"/>
-                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="GPU" android:textColor="#FF2840" android:textSize="14sp" android:textStyle="bold" android:letterSpacing="0.15" android:layout_marginTop="6dp"/>
+                <TextView android:id="@+id/gpuFreq" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="--" android:textColor="#FFFFFF" android:textSize="30sp" android:textStyle="bold"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="MHz" android:textColor="#9A9AA0" android:textSize="12sp" android:layout_marginBottom="0dp"/>
+                <com.mora.gamedock.GlowRingView android:id="@+id/gpuRing" android:layout_width="130dp" android:layout_height="96dp" android:layout_marginTop="-6dp"/>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="GPU" android:textColor="#FF2840" android:textSize="14sp" android:textStyle="bold" android:letterSpacing="0.15" android:layout_marginTop="-10dp"/>
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Ordinary Noti" android:textColor="#FFFFFF" android:textSize="13sp" android:background="@drawable/card_bg" android:paddingHorizontal="16dp" android:paddingVertical="7dp" android:layout_marginTop="12dp"/>
             </LinearLayout>
 

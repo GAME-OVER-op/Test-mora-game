@@ -21,6 +21,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView cpuFreq, gpuFreq, batteryText, tempText, rootStatus, perfButton;
 
     private long lastTotal = 0, lastIdle = 0;
+    private long cpuMax7 = 0, cpuMax0 = 0, gpuMax = 0; // кэш макс. частот (кГц / Гц)
 
     // Режимы RedMagic и их цвета: Баланс (голубой), Подъём (жёлтый), За пределами (красный)
     private static final String[] MODE_NAMES = {"\u0411\u0430\u043b\u0430\u043d\u0441", "\u041f\u043e\u0434\u044a\u0451\u043c", "\u0417\u0430 \u043f\u0440\u0435\u0434\u0435\u043b\u0430\u043c\u0438"};
@@ -35,6 +36,11 @@ public class MainActivity extends AppCompatActivity {
     private static final String GPU_DEVFREQ = "/sys/class/kgsl/kgsl-3d0/devfreq/cur_freq";
     private static final String BATT_CAP = "/sys/class/power_supply/battery/capacity";
     private static final String BATT_TEMP = "/sys/class/power_supply/battery/temp";
+    // максимальные частоты — для «% заполнения от частоты»
+    private static final String CPU0_MAX = "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq";
+    private static final String CPU7_MAX = "/sys/devices/system/cpu/cpu7/cpufreq/cpuinfo_max_freq";
+    private static final String GPU_MAX = "/sys/class/kgsl/kgsl-3d0/devfreq/max_freq";
+    private static final String GPU_MAX2 = "/sys/class/kgsl/kgsl-3d0/max_gpuclk";
 
     @Override
     protected void onCreate(Bundle s) {
@@ -90,8 +96,8 @@ public class MainActivity extends AppCompatActivity {
         rootStatus.setTextColor(root.available ? 0xFF4CD964 : 0xFFFFB020);
         cpuFreq.setText(String.format(Locale.US, "%.2f", m.cpuFreqGhz));
         gpuFreq.setText(String.valueOf(Math.round(m.gpuFreqMhz)));
-        cpuRing.setProgress((float) m.cpuLoad);
-        gpuRing.setProgress((float) m.gpuBusy);
+        cpuRing.setProgress((float) m.cpuFill);
+        gpuRing.setProgress((float) m.gpuFill);
         batteryText.setText(m.battery + "%");
         tempText.setText(String.format(Locale.US, "%.1f\u00b0C", m.tempC));
     }
@@ -126,9 +132,12 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
+        long fmax;
         long f = readL(CPU7, 0);
-        if (f <= 0) f = readL(CPU0, 0);
+        if (f > 0) { if (cpuMax7 == 0) cpuMax7 = readL(CPU7_MAX, 0); fmax = cpuMax7; }
+        else { f = readL(CPU0, 0); if (cpuMax0 == 0) cpuMax0 = readL(CPU0_MAX, 0); fmax = cpuMax0; }
         m.cpuFreqGhz = f / 1_000_000.0;
+        m.cpuFill = fmax > 0 ? Math.min(1.0, f / (double) fmax) : 0;
 
         String gb = readS(GPU_BUSY);
         if (gb != null && !gb.isEmpty()) {
@@ -138,6 +147,8 @@ public class MainActivity extends AppCompatActivity {
         long g = readL(GPU_CLK, 0);
         if (g <= 0) g = readL(GPU_DEVFREQ, 0);
         m.gpuFreqMhz = g / 1_000_000.0;
+        if (gpuMax == 0) { gpuMax = readL(GPU_MAX, 0); if (gpuMax == 0) gpuMax = readL(GPU_MAX2, 0); }
+        m.gpuFill = gpuMax > 0 ? Math.min(1.0, g / (double) gpuMax) : 0;
 
         m.battery = (int) readL(BATT_CAP, 0);
         long temp = readL(BATT_TEMP, 0);

@@ -55,7 +55,7 @@ public class GlowRingView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         float w = getWidth(), h = getHeight();
-        float cx = w / 2f, cy = h / 2f;
+        float cx = w / 2f, cy = h * 0.40f; // кольцо выше центра — ближе к цифрам
         float rx = Math.min(w / 2f - 4f * density, (h / 2f - 4f * density) / RATIO);
         float lift = rx * 0.05f;
 
