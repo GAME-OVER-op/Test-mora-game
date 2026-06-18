@@ -17,6 +17,7 @@ public class FrameBorderView extends View {
     private final Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint line = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path path = new Path();
+    private final Path chev = new Path();
     private float density = 2f;
 
     public FrameBorderView(Context c) { super(c); init(); }
@@ -65,13 +66,31 @@ public class FrameBorderView extends View {
         path.close();
     }
 
+    private void buildChevrons(float w, float h) {
+        float top = h * 0.15f, bot = h * 0.85f, mid = h * 0.42f, dep = 24f * density;
+        float lx = w * 0.33f, rx = w * 0.67f;
+        chev.reset();
+        // левый › (вершина вправо)
+        chev.moveTo(lx, top);
+        chev.lineTo(lx + dep, mid);
+        chev.lineTo(lx, bot);
+        // правый ‹ (вершина влево)
+        chev.moveTo(rx, top);
+        chev.lineTo(rx - dep, mid);
+        chev.lineTo(rx, bot);
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
-        buildPath(getWidth(), getHeight());
+        float w = getWidth(), h = getHeight();
+        buildPath(w, h);
+        buildChevrons(w, h);
         glow.setStrokeWidth(6f * density);
         glow.setMaskFilter(new BlurMaskFilter(6f * density, BlurMaskFilter.Blur.NORMAL));
         canvas.drawPath(path, glow);
+        canvas.drawPath(chev, glow);
         line.setStrokeWidth(2f * density);
         canvas.drawPath(path, line);
+        canvas.drawPath(chev, line);
     }
 }
