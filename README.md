@@ -1,42 +1,36 @@
-# Mora GameDock
+# GameSpace Panel Preview
 
-Прототип игровой панели (в стиле nubia GameAssist) для RedMagic 9 Pro / проекта **mora**.
-Показывает **живые** показатели CPU/GPU, батарею/температуру, переключатель режимов и сетку карточек-тумблеров.
+Минимальный Android-проект для GitHub Actions. Он показывает тестовое окно, похожее на внутриигровую свайп-панель Game Space / Game Control Center.
 
-## Что внутри
-- `CircleGaugeView` — круговой индикатор частот/загрузки (аналог `CpuGpuView`).
-- `RootShell` + `Sysfs` — чтение sysfs через `su` (или напрямую, если root недоступен).
-- `MainActivity` — опрос раз в секунду и обновление UI.
-- `TileAdapter` — карточки-плитки (аналог `TileView`/`DockTile`).
+Используемые исходные ресурсы из разобранного GameSpace:
 
-## Источники данных (sysfs)
-- CPU частота: `/sys/devices/system/cpu/cpu7/cpufreq/scaling_cur_freq` (prime), `cpu0` (fallback)
-- CPU загрузка: `/proc/stat`
-- GPU загрузка: `/sys/class/kgsl/kgsl-3d0/gpu_busy_percentage`
-- GPU частота: `/sys/class/kgsl/kgsl-3d0/gpuclk` (или `devfreq/cur_freq`)
-- Батарея: `/sys/class/power_supply/battery/capacity`, темп.: `.../battery/temp`
+- `panel_item_red_right.png`
+- `panel_item_red_right_end.png`
+- `gamecontrol_title_background.png`
+- `gamecontrol_title_close.png`
+- `nubia_game_strengthen_mask.png`
 
-## Сборка в CI (GitLab)
-1. Создай пустой репозиторий на GitLab.
-2. Залей туда всё содержимое этой папки (включая `.gitlab-ci.yml`).
-3. GitLab CI сам скачает Android SDK и соберёт APK.
-4. Готовый APK будет в **CI/CD → Jobs → build_apk → Browse/Download artifacts**: `app/build/outputs/apk/debug/app-debug.apk`.
+Это не оригинальный сервис и не вызывает системные функции. Это только визуальный preview, чтобы проверить, та ли это карточка/панель.
 
-### Альтернатива: GitHub Actions
-Файл `.github/workflows/build.yml` уже готов — при push APK появится в **Actions → ран → Artifacts → app-debug**.
+## Как собрать через GitHub
 
-## Установка
-```sh
-adb install -r app-debug.apk
-```
-Затем в Magisk/SU разреши root для `com.mora.gamedock` — иначе часть показателей будет пустой.
+1. Создай новый репозиторий на GitHub.
+2. Загрузи все файлы из этого архива в корень репозитория.
+3. Открой вкладку **Actions**.
+4. Запусти workflow **Build Android Debug APK** вручную через **Run workflow**.
+5. После сборки скачай artifact `GameSpacePanelPreview-debug-apk`.
+6. Установи `app-debug.apk` на телефон.
 
-## Сборка локально
-```sh
+## Локальная сборка
+
+Если установлен Android SDK и Gradle:
+
+```bash
 gradle assembleDebug
-# или в Android Studio: Run
 ```
 
-## Дальше (интеграция в mora)
-- Перевести панель в overlay-окно (`TYPE_APPLICATION_OVERLAY`) для вызова поверх игры.
-- Подключить тумблеры к реальным действиям и к perf_daemon.
+APK будет тут:
+
+```text
+app/build/outputs/apk/debug/app-debug.apk
+```
