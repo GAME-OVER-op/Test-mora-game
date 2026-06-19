@@ -1,36 +1,25 @@
-# GameSpace Panel Preview
+# GameSpace Control Center Preview
 
-Минимальный Android-проект для GitHub Actions. Он показывает тестовое окно, похожее на внутриигровую свайп-панель Game Space / Game Control Center.
+Вторая попытка. Это не `GameStrengthen` с левым меню, а preview для **Game Space Control Center / QS cards** — той панели, которая относится к `cc_tiles_game`, `cc_tools_game`, `control_center` и `ic_qs_*` ресурсам.
 
-Используемые исходные ресурсы из разобранного GameSpace:
+Использованы реальные ресурсы из APK:
 
-- `panel_item_red_right.png`
-- `panel_item_red_right_end.png`
-- `gamecontrol_title_background.png`
-- `gamecontrol_title_close.png`
-- `nubia_game_strengthen_mask.png`
+- `control_center_ing.png`
+- `control_center_dising.png`
+- `game_control_panel_for_card.png`
+- `red_magic_time_for_card.png`
+- `more_select_for_card.png`
+- `userdefine_*`
+- `ic_qs_*`
+- `game_space_window_bg.png`
 
-Это не оригинальный сервис и не вызывает системные функции. Это только визуальный preview, чтобы проверить, та ли это карточка/панель.
+Это визуальный preview, не системный overlay.
 
-## Как собрать через GitHub
+## Сборка GitHub
 
-1. Создай новый репозиторий на GitHub.
-2. Загрузи все файлы из этого архива в корень репозитория.
-3. Открой вкладку **Actions**.
-4. Запусти workflow **Build Android Debug APK** вручную через **Run workflow**.
-5. После сборки скачай artifact `GameSpacePanelPreview-debug-apk`.
-6. Установи `app-debug.apk` на телефон.
+1. Загрузи содержимое этой папки в новый репозиторий.
+2. Actions → `Build Android Debug APK` → Run workflow.
+3. Скачай artifact `GameSpaceControlCenterPreview-debug-apk`.
+4. Установи `app-debug.apk`.
 
-## Локальная сборка
-
-Если установлен Android SDK и Gradle:
-
-```bash
-gradle assembleDebug
-```
-
-APK будет тут:
-
-```text
-app/build/outputs/apk/debug/app-debug.apk
-```
+Тап по правой/левой половине экрана меняет сторону панели.
