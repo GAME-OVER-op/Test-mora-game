@@ -55,6 +55,20 @@ public final class NubiaTouchDb {
         }
     }
 
+    /** Parse the stored raw string value for a package (everything after '+'). */
+    public static String parseString(String raw, String pkg, String def) {
+        if (raw == null || raw.isEmpty()) return def;
+        if (raw.indexOf(pkg) == -1) return def;
+        for (String e : raw.split(",")) {
+            String t = e.trim();
+            if (t.isEmpty() || t.indexOf(pkg) == -1) continue;
+            int from = t.indexOf("+");
+            if (from == -1) return def;
+            return t.substring(from + 1);
+        }
+        return def;
+    }
+
     /** Parse the stored string back to int[] for a package (mirrors parserParamFromDB). */
     public static int[] parse(String raw, String pkg, int[] def) {
         if (raw == null || raw.isEmpty()) return def;

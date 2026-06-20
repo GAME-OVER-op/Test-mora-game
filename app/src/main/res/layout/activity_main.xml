@@ -20,18 +20,40 @@
             android:alpha="0.7"
             android:textSize="13sp" />
 
-        <EditText
-            android:id="@+id/target_package"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:background="@drawable/pill_unselected"
-            android:hint="@string/target_package_hint"
-            android:textColorHint="#80FFFFFF"
-            android:textColor="@color/white"
-            android:inputType="text"
-            android:padding="12dp"
-            android:textSize="14sp" />
+            android:orientation="horizontal"
+            android:layout_marginTop="4dp">
+
+            <EditText
+                android:id="@+id/target_package"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="54dp"
+                android:background="@drawable/pill_unselected"
+                android:hint="@string/target_package_hint"
+                android:textColorHint="#80FFFFFF"
+                android:textColor="@color/white"
+                android:inputType="text"
+                android:imeOptions="actionSearch"
+                android:maxLines="1"
+                android:padding="12dp"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/search_button"
+                android:layout_width="wrap_content"
+                android:layout_height="54dp"
+                android:layout_marginStart="10dp"
+                android:minWidth="96dp"
+                android:gravity="center"
+                android:background="@drawable/pill_selected"
+                android:text="@string/search_button"
+                android:textColor="@color/white"
+                android:textStyle="bold"
+                android:textSize="14sp" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/root_status"
@@ -41,6 +63,92 @@
             android:text="@string/root_required"
             android:textColor="@color/accent"
             android:textSize="12sp" />
+
+        <!-- ============ GAMES LIST (db_game_strengthen_mode_list) = selector ============ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="15dp"
+            android:background="@drawable/panel_bg">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:gravity="start|center_vertical"
+                android:background="@drawable/panel_header_bg"
+                android:paddingStart="16dp"
+                android:text="@string/strengthen_list_title"
+                android:textColor="@color/white"
+                android:textSize="15sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="12dp"
+                android:text="@string/strengthen_list_desc"
+                android:textColor="@color/white"
+                android:alpha="0.5"
+                android:textSize="11sp" />
+
+            <LinearLayout
+                android:id="@+id/strengthen_list_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="12dp">
+
+                <TextView
+                    android:id="@+id/strengthen_list_add"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="48dp"
+                    android:gravity="center"
+                    android:background="@drawable/pill_bg"
+                    android:text="@string/strengthen_list_add"
+                    android:textColor="@color/white"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/strengthen_list_save"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="10dp"
+                    android:gravity="center"
+                    android:background="@drawable/pill_bg"
+                    android:text="@string/strengthen_list_save"
+                    android:textColor="@color/white"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- shown until a package is searched -->
+        <TextView
+            android:id="@+id/hint_search"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="40dp"
+            android:gravity="center"
+            android:text="@string/hint_search_first"
+            android:textColor="@color/white"
+            android:alpha="0.5"
+            android:textSize="14sp" />
+
+        <!-- everything below is hidden until a package is searched -->
+        <LinearLayout
+            android:id="@+id/content_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
 
         <!-- ================= PERFORMANCE PANEL ================= -->
         <LinearLayout
@@ -483,6 +591,7 @@
                     android:textColor="@color/white"
                     android:textSize="12sp" />
             </LinearLayout>
+        </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

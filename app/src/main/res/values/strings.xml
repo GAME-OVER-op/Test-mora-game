@@ -3,15 +3,19 @@
     <string name="app_name">Регулировка сенсора</string>
 
     <!-- target package -->
-    <string name="target_package_label">Пакет игры (необязательно)</string>
+    <string name="target_package_label">Добавить игру в список</string>
     <string name="target_package_hint">например com.mobile.legends</string>
+    <string name="search_button">Добавить</string>
+    <string name="msg_enter_package">Введите полное имя пакета игры и нажмите «Добавить»</string>
+    <string name="msg_loaded">Загружены настройки для %1$s</string>
+    <string name="hint_search_first">Выберите игру из списка ниже (✎), чтобы редактировать её настройки</string>
     <string name="root_required">Нужны root-права. Запись настроек выполняется через su.</string>
 
     <!-- performance panel -->
     <string name="perf_title">Производительность</string>
     <string name="perf_mode">Режим производительности</string>
     <string name="perf_mode_balance">Баланс</string>
-    <string name="perf_mode_performance">Производительность</string>
+    <string name="perf_mode_performance">Подъем</string>
     <string name="perf_mode_beyond">За пределами</string>
     <string name="perf_cpu">ЦП</string>
     <string name="perf_gpu">ГП</string>
@@ -45,4 +49,9 @@
     <string name="display_gamma_default">Стандарт</string>
     <string name="display_gamma_racing">Гонки</string>
     <string name="display_gamma_shooting">Стрельба</string>
+    <string name="strengthen_list_title">Список усиления (db_game_strengthen_mode_list)</string>
+    <string name="strengthen_list_desc">Список игр (db_game_strengthen_mode_list). ✎ — редактировать настройки игры, ✕ — удалить, «+ Добавить» — новая строка, «Сохранить список» — записать в систему.</string>
+    <string name="strengthen_list_add">+ Добавить</string>
+    <string name="strengthen_list_save">Сохранить список</string>
+    <string name="strengthen_list_saved">Список сохранён (%1$d записей)</string>
 </resources>
