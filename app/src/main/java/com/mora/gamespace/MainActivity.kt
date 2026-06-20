@@ -1,16 +1,19 @@
 package com.mora.gamespace
 
 import android.content.Intent
+import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
+import android.widget.FrameLayout
 import android.widget.VideoView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -29,7 +32,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -105,6 +108,9 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun GameSpaceRoot() {
     var splashVisible by remember { mutableStateOf(true) }
+    var bgmEnabled by remember { mutableStateOf(true) }
+
+    BackgroundMusic(enabled = bgmEnabled)
 
     LaunchedEffect(Unit) {
         delay(3600)
@@ -113,7 +119,7 @@ private fun GameSpaceRoot() {
 
     MaterialTheme {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
-            GameLobby()
+            GameLobby(bgmEnabled = bgmEnabled, onBgmToggle = { bgmEnabled = !bgmEnabled })
             AnimatedVisibility(
                 visible = splashVisible,
                 enter = fadeIn(tween(250)),
@@ -126,23 +132,59 @@ private fun GameSpaceRoot() {
 }
 
 @Composable
+private fun BackgroundMusic(enabled: Boolean) {
+    val context = LocalContext.current
+    val player = remember {
+        MediaPlayer.create(context, R.raw.bgm).apply {
+            isLooping = true
+            setVolume(0.42f, 0.42f)
+        }
+    }
+    LaunchedEffect(enabled) {
+        if (enabled) {
+            if (!player.isPlaying) player.start()
+        } else if (player.isPlaying) {
+            player.pause()
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            runCatching { player.stop() }
+            player.release()
+        }
+    }
+}
+
+@Composable
 private fun StartAnimation(onFinished: () -> Unit) {
     val context = LocalContext.current
     AndroidView(
         modifier = Modifier.fillMaxSize().background(Color.Black),
         factory = {
-            VideoView(it).apply {
-                setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.start_animation}"))
-                setOnPreparedListener { mp ->
-                    mp.isLooping = false
-                    mp.setVolume(0f, 0f)
-                    start()
+            FrameLayout(it).apply {
+                setBackgroundColor(android.graphics.Color.BLACK)
+                val video = VideoView(it).apply {
+                    layoutParams = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        android.view.Gravity.CENTER,
+                    )
+                    setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.start_animation}"))
+                    setOnPreparedListener { mp ->
+                        mp.isLooping = false
+                        mp.setVolume(0f, 0f)
+                        // Crop-fill: немного приближаем видео, чтобы не было полос/вырезов по бокам.
+                        scaleX = 1.22f
+                        scaleY = 1.22f
+                        start()
+                    }
+                    setOnCompletionListener { onFinished() }
+                    setOnErrorListener { _, _, _ ->
+                        onFinished()
+                        true
+                    }
                 }
-                setOnCompletionListener { onFinished() }
-                setOnErrorListener { _, _, _ ->
-                    onFinished()
-                    true
-                }
+                addView(video)
             }
         }
     )
@@ -162,8 +204,9 @@ private val demoGames = listOf(
 )
 
 @Composable
-private fun GameLobby() {
+private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit) {
     var selectedIndex by remember { mutableIntStateOf(0) }
+    var fanEnabled by remember { mutableStateOf(true) }
     val selected = demoGames[selectedIndex]
     val context = LocalContext.current
 
@@ -204,9 +247,15 @@ private fun GameLobby() {
                     context.startActivity(launchIntent)
                 }
             },
-            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 34.dp, top = 56.dp),
+            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 34.dp, top = 66.dp),
         )
-        BottomDock(Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp))
+        BottomDock(
+            fanEnabled = fanEnabled,
+            bgmEnabled = bgmEnabled,
+            onFanToggle = { fanEnabled = !fanEnabled },
+            onBgmToggle = onBgmToggle,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp),
+        )
     }
 }
 
@@ -228,7 +277,23 @@ private fun TopHud(modifier: Modifier = Modifier) {
                 contentAlignment = Alignment.Center,
             ) { Text("M", color = Color.White, fontWeight = FontWeight.Bold) }
         }
-        Text("●", color = Color.White.copy(alpha = .72f), fontSize = 30.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            TopIconButton(R.drawable.add_shortcut_icon)
+            TopIconButton(R.drawable.chat_assistant_settings)
+        }
+    }
+}
+
+@Composable
+private fun TopIconButton(iconRes: Int) {
+    Box(
+        Modifier.size(42.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color.Black.copy(.35f))
+            .border(1.dp, Color.White.copy(.18f), RoundedCornerShape(8.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(painterResource(iconRes), contentDescription = null, modifier = Modifier.size(28.dp), contentScale = ContentScale.Fit)
     }
 }
 
@@ -288,37 +353,37 @@ private fun LeftGameRail(games: List<GameCard>, selectedIndex: Int, onSelected: 
 private fun CoreReactor(modifier: Modifier = Modifier) {
     val transition = rememberInfiniteTransition(label = "reactor")
     val pulse by transition.animateFloat(
-        initialValue = .82f,
-        targetValue = 1.06f,
-        animationSpec = infiniteRepeatable(tween(1900, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        initialValue = .88f,
+        targetValue = 1.03f,
+        animationSpec = infiniteRepeatable(tween(2400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "pulse"
     )
     val rotation by transition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(16000), RepeatMode.Restart),
+        animationSpec = infiniteRepeatable(tween(36000, easing = LinearEasing), RepeatMode.Restart),
         label = "rotation"
     )
     Box(modifier, contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize().graphicsLayer { rotationZ = rotation }) {
             val r = size.minDimension / 2f
-            drawCircle(Color(0xFF0A0D11).copy(alpha = .72f), r)
-            drawCircle(Color(0xFFFF203D).copy(alpha = .20f * pulse), r * .84f)
-            drawCircle(Color(0xFFFF4B52).copy(alpha = .15f), r * .58f, style = Stroke(width = 18f))
-            repeat(64) { i ->
-                val a = Math.toRadians((i * 360.0 / 64.0))
-                val inner = r * .87f
-                val outer = if (i % 4 == 0) r * .98f else r * .93f
+            drawCircle(Color(0xFF0A0D11).copy(alpha = .70f), r)
+            drawCircle(Color(0xFFFF203D).copy(alpha = .18f * pulse), r * .84f)
+            drawCircle(Color(0xFFFF4B52).copy(alpha = .14f), r * .58f, style = Stroke(width = 18f))
+            repeat(96) { i ->
+                val a = Math.toRadians((i * 360.0 / 96.0))
+                val inner = r * .88f
+                val outer = if (i % 6 == 0) r * .98f else r * .93f
                 drawLine(
-                    Color.White.copy(alpha = if (i % 4 == 0) .18f else .08f),
+                    Color.White.copy(alpha = if (i % 6 == 0) .16f else .065f),
                     Offset(center.x + kotlin.math.cos(a).toFloat() * inner, center.y + kotlin.math.sin(a).toFloat() * inner),
                     Offset(center.x + kotlin.math.cos(a).toFloat() * outer, center.y + kotlin.math.sin(a).toFloat() * outer),
-                    strokeWidth = if (i % 4 == 0) 4f else 2f,
+                    strokeWidth = if (i % 6 == 0) 3.5f else 1.5f,
                 )
             }
         }
-        Box(Modifier.size(130.dp).clip(CircleShape).background(Brush.radialGradient(listOf(Color(0xFF3B0710), Color.Black))).border(3.dp, Color(0xFF26313A), CircleShape), contentAlignment = Alignment.Center) {
-            Text("M", color = Color(0xFFFF5462), fontSize = 62.sp, fontWeight = FontWeight.Black)
+        Box(Modifier.size(138.dp).clip(CircleShape).background(Brush.radialGradient(listOf(Color(0xFF3B0710), Color.Black))).border(3.dp, Color(0xFF26313A), CircleShape), contentAlignment = Alignment.Center) {
+            Image(painterResource(R.drawable.rm_logo), contentDescription = null, modifier = Modifier.size(102.dp), contentScale = ContentScale.Fit)
         }
     }
 }
@@ -326,15 +391,11 @@ private fun CoreReactor(modifier: Modifier = Modifier) {
 @Composable
 private fun SelectedGamePanel(game: GameCard, onLaunch: () -> Unit, modifier: Modifier = Modifier) {
     Column(modifier = modifier.width(292.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            SmallHexButton("▰")
-            SmallHexButton("◈")
-        }
-        Spacer(Modifier.height(60.dp))
+        Spacer(Modifier.height(116.dp))
         Text(game.title, color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             RedLaunchButton("Запуск игры", onLaunch)
-            HexArrowButton()
+            SpeedButton()
         }
     }
 }
@@ -346,37 +407,34 @@ private fun RedLaunchButton(text: String, onClick: () -> Unit) {
             .border(1.dp, Color(0xFFFF604A), RoundedCornerShape(7.dp)).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            Text("❯", color = Color.White.copy(.72f), fontSize = 30.sp)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+            Image(painterResource(R.drawable.exo_ic_chevron_right), contentDescription = null, modifier = Modifier.size(30.dp), contentScale = ContentScale.Fit)
             Text(text, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Text("❮", color = Color.White.copy(.72f), fontSize = 30.sp)
+            Image(painterResource(R.drawable.exo_ic_chevron_left), contentDescription = null, modifier = Modifier.size(30.dp), contentScale = ContentScale.Fit)
         }
     }
 }
 
 @Composable
-private fun HexArrowButton() {
+private fun SpeedButton() {
     Box(Modifier.size(54.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF260507).copy(.72f)).border(1.dp, Color(0xFFFF604A), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-        Text(">", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.Light)
+        Image(painterResource(R.drawable.exo_ic_speed), contentDescription = null, modifier = Modifier.size(32.dp), contentScale = ContentScale.Fit)
     }
 }
 
 @Composable
-private fun SmallHexButton(label: String) {
-    Box(Modifier.size(38.dp).clip(RoundedCornerShape(7.dp)).background(Color.Black.copy(.28f)).border(1.dp, Color.White.copy(.24f), RoundedCornerShape(7.dp)), contentAlignment = Alignment.Center) {
-        Text(label, color = Color.White.copy(.86f), fontSize = 18.sp)
-    }
-}
-
-@Composable
-private fun BottomDock(modifier: Modifier = Modifier) {
+private fun BottomDock(
+    fanEnabled: Boolean,
+    bgmEnabled: Boolean,
+    onFanToggle: () -> Unit,
+    onBgmToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Row(modifier = modifier.fillMaxWidth().padding(horizontal = 310.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween) {
         SkewDock()
         Row(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
-            DockHex("▣")
-            DockHex("▦")
-            DockHex("♪")
-            DockHex("✤")
+            RoundDockButton(iconRes = if (fanEnabled) R.drawable.cooling_fan_on else R.drawable.cooling_fan_off, onClick = onFanToggle)
+            RoundDockButton(iconRes = if (bgmEnabled) R.drawable.bgm_on else R.drawable.bgm_off, onClick = onBgmToggle)
         }
     }
 }
@@ -390,32 +448,24 @@ private fun SkewDock() {
         border = BorderStroke(1.dp, Color.White.copy(.25f)),
     ) {
         Row(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color(0xFF7E151B).copy(.78f), Color(0xFF16181D).copy(.78f)))), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly) {
-            Text("⌂", color = Color.White, fontSize = 26.sp)
+            Image(painterResource(R.drawable.gamelobby_icon), contentDescription = null, modifier = Modifier.size(30.dp), contentScale = ContentScale.Fit)
             Text("Game Lobby", color = Color.White, fontSize = 12.sp)
-            Text("▥", color = Color.White.copy(.78f), fontSize = 26.sp)
+            Image(painterResource(R.drawable.top_indicator_expand), contentDescription = null, modifier = Modifier.size(30.dp), contentScale = ContentScale.Fit)
             Text("Высокопроизвод", color = Color.White.copy(.7f), fontSize = 12.sp, maxLines = 1)
         }
     }
 }
 
 @Composable
-private fun DockHex(label: String) {
-    Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            val p = Path().apply {
-                moveTo(w * .50f, 0f)
-                lineTo(w * .90f, h * .25f)
-                lineTo(w * .90f, h * .75f)
-                lineTo(w * .50f, h)
-                lineTo(w * .10f, h * .75f)
-                lineTo(w * .10f, h * .25f)
-                close()
-            }
-            drawPath(p, Color(0xFF171A20).copy(.86f))
-            drawPath(p, Color.White.copy(.20f), style = Stroke(width = 2f))
-        }
-        Text(label, color = Color.White.copy(.86f), fontSize = 23.sp)
+private fun RoundDockButton(iconRes: Int, onClick: () -> Unit) {
+    Box(
+        Modifier.size(50.dp)
+            .clip(CircleShape)
+            .background(Brush.radialGradient(listOf(Color(0xFF3A3D44).copy(.90f), Color(0xFF0F1116).copy(.88f))))
+            .border(1.dp, Color.White.copy(.20f), CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(painterResource(iconRes), contentDescription = null, modifier = Modifier.size(31.dp), contentScale = ContentScale.Fit)
     }
 }
