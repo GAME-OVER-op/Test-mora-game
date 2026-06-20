@@ -1,13 +1,18 @@
 package com.mora.gamespace
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Matrix
+import android.graphics.Paint
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.BatteryManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.TextureView
 import android.view.Surface as AndroidSurface
 import android.view.View
@@ -16,15 +21,9 @@ import android.view.WindowInsetsController
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -58,8 +57,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -198,34 +195,32 @@ private fun GameSpaceRoot() {
 @Composable
 private fun BackgroundMusic(enabled: Boolean) {
     val context = LocalContext.current
-    val player = remember {
-        MediaPlayer.create(context, R.raw.bgm)?.apply {
-            setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build()
-            )
-            isLooping = true
-            setVolume(1f, 1f)
-        }
-    }
 
-    LaunchedEffect(enabled, player) {
-        val mediaPlayer = player ?: return@LaunchedEffect
-        if (enabled) {
-            if (!mediaPlayer.isPlaying) mediaPlayer.start()
-        } else if (mediaPlayer.isPlaying) {
-            mediaPlayer.pause()
+    // One explicit player lifecycle per enabled session. No hidden remember player,
+    // no OGG decoder loop instability, no start before the second screen is ready.
+    DisposableEffect(enabled) {
+        if (!enabled) {
+            return@DisposableEffect onDispose { }
         }
-    }
 
-    DisposableEffect(Unit) {
+        val player = MediaPlayer()
+        val afd = context.resources.openRawResourceFd(R.raw.bgm_loop)
+        player.setAudioAttributes(
+            AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .build()
+        )
+        player.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+        afd.close()
+        player.isLooping = true
+        player.setVolume(1f, 1f)
+        player.setOnPreparedListener { it.start() }
+        player.prepareAsync()
+
         onDispose {
-            player?.let { mediaPlayer ->
-                runCatching { mediaPlayer.stop() }
-                mediaPlayer.release()
-            }
+            runCatching { player.stop() }
+            player.release()
         }
     }
 }
@@ -423,22 +418,51 @@ private data class HudState(val time: String, val batteryPercent: Int)
 private fun rememberHudState(): State<HudState> {
     val context = LocalContext.current
     val state = remember { mutableStateOf(readHudState(context)) }
+
+    // Time update: once per minute is enough for HH:mm and avoids constant second-screen work.
     LaunchedEffect(Unit) {
         while (true) {
-            state.value = readHudState(context)
-            delay(10_000)
+            state.value = state.value.copy(time = currentTimeText())
+            delay(60_000)
         }
     }
+
+    // Battery update: event-driven, no polling/registerReceiver loop.
+    DisposableEffect(context) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(receiverContext: Context, intent: Intent) {
+                state.value = HudState(
+                    time = currentTimeText(),
+                    batteryPercent = batteryPercentFromIntent(intent),
+                )
+            }
+        }
+        val sticky = context.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        if (sticky != null) {
+            state.value = HudState(currentTimeText(), batteryPercentFromIntent(sticky))
+        }
+        onDispose {
+            runCatching { context.unregisterReceiver(receiver) }
+        }
+    }
+
     return state
 }
 
-private fun readHudState(context: android.content.Context): HudState {
-    val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-    val batteryIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-    val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
-    val scale = batteryIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
-    val percent = if (level >= 0 && scale > 0) ((level * 100f) / scale).toInt().coerceIn(0, 100) else 0
-    return HudState(time = time, batteryPercent = percent)
+private fun readHudState(context: Context): HudState {
+    val sticky = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+    return HudState(
+        time = currentTimeText(),
+        batteryPercent = sticky?.let { batteryPercentFromIntent(it) } ?: 0,
+    )
+}
+
+private fun currentTimeText(): String = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+
+private fun batteryPercentFromIntent(intent: Intent): Int {
+    val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+    val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+    return if (level >= 0 && scale > 0) ((level * 100f) / scale).toInt().coerceIn(0, 100) else 0
 }
 
 @Composable
@@ -487,7 +511,6 @@ private fun LeftGameRail(games: List<GameCard>, selectedIndex: Int, onSelected: 
             ) {
                 Box(
                     Modifier.size(68.dp)
-                        .shadow(if (index == selectedIndex) 12.dp else 0.dp, RoundedCornerShape(13.dp))
                         .clip(RoundedCornerShape(13.dp))
                         .background(Color(0xFF111318))
                         .border(
@@ -520,40 +543,12 @@ private fun LeftGameRail(games: List<GameCard>, selectedIndex: Int, onSelected: 
 
 @Composable
 private fun CoreReactor(modifier: Modifier = Modifier, animationsEnabled: Boolean) {
-    val transition = rememberInfiniteTransition(label = "reactor")
-    val animatedRotation by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(22000, easing = LinearEasing), RepeatMode.Restart),
-        label = "reactorRotation",
-    )
-    val animatedPulse by transition.animateFloat(
-        initialValue = .92f,
-        targetValue = 1.04f,
-        animationSpec = infiniteRepeatable(tween(2600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "reactorPulse",
-    )
-    val rotation = if (animationsEnabled) animatedRotation else 0f
-    val pulse = if (animationsEnabled) animatedPulse else 1f
-
     Box(modifier, contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxSize()) {
-            val r = size.minDimension / 2f
-            drawCircle(Color(0xFF0A0D11).copy(alpha = .66f), r)
-            drawCircle(Color(0xFFFF203D).copy(alpha = .18f * pulse), r * .84f)
-            drawCircle(Color(0xFFFF4B52).copy(alpha = .14f), r * .58f, style = Stroke(width = 18f))
-            repeat(48) { i ->
-                val a = Math.toRadians((rotation + i * 360.0 / 48.0))
-                val inner = r * .89f
-                val outer = if (i % 4 == 0) r * .985f else r * .94f
-                drawLine(
-                    Color.White.copy(alpha = if (i % 4 == 0) .14f else .052f),
-                    Offset(center.x + kotlin.math.cos(a).toFloat() * inner, center.y + kotlin.math.sin(a).toFloat() * inner),
-                    Offset(center.x + kotlin.math.cos(a).toFloat() * outer, center.y + kotlin.math.sin(a).toFloat() * outer),
-                    strokeWidth = if (i % 4 == 0) 3f else 1.2f,
-                )
-            }
-        }
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { ReactorView(it) },
+            update = { it.animationsEnabled = animationsEnabled },
+        )
         Box(Modifier.size(138.dp).clip(CircleShape).background(Brush.radialGradient(listOf(Color(0xFF3B0710), Color.Black))).border(3.dp, Color(0xFF26313A), CircleShape), contentAlignment = Alignment.Center) {
             Image(painterResource(R.drawable.rm_logo), contentDescription = null, modifier = Modifier.size(102.dp), contentScale = ContentScale.Fit)
         }
@@ -655,5 +650,91 @@ private fun RoundDockButton(iconRes: Int, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Image(painterResource(iconRes), contentDescription = null, modifier = Modifier.size(31.dp), contentScale = ContentScale.Fit)
+    }
+}
+
+
+private class ReactorView(context: Context) : View(context) {
+    private val handler = Handler(Looper.getMainLooper())
+    private var rotationDeg = 0f
+    private var pulse = 1f
+    private var frame = 0
+
+    var animationsEnabled: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            if (value) startLoop() else stopLoop()
+            invalidate()
+        }
+
+    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    private val tick = object : Runnable {
+        override fun run() {
+            if (!animationsEnabled) return
+            rotationDeg = (rotationDeg + 0.55f) % 360f
+            frame++
+            pulse = 1f + kotlin.math.sin(frame / 24f) * 0.055f
+            invalidate()
+            handler.postDelayed(this, 33L) // ~30 FPS, stable and lighter than Compose recomposition every vsync
+        }
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (animationsEnabled) startLoop()
+    }
+
+    override fun onDetachedFromWindow() {
+        stopLoop()
+        super.onDetachedFromWindow()
+    }
+
+    private fun startLoop() {
+        handler.removeCallbacks(tick)
+        handler.post(tick)
+    }
+
+    private fun stopLoop() {
+        handler.removeCallbacks(tick)
+    }
+
+    override fun onDraw(canvas: android.graphics.Canvas) {
+        super.onDraw(canvas)
+        val cx = width / 2f
+        val cy = height / 2f
+        val r = kotlin.math.min(width, height) / 2f
+
+        fillPaint.color = android.graphics.Color.argb(168, 10, 13, 17)
+        canvas.drawCircle(cx, cy, r, fillPaint)
+
+        fillPaint.color = android.graphics.Color.argb((46 * pulse).toInt().coerceIn(28, 60), 255, 32, 61)
+        canvas.drawCircle(cx, cy, r * .84f, fillPaint)
+
+        strokePaint.color = android.graphics.Color.argb(36, 255, 75, 82)
+        strokePaint.strokeWidth = 18f
+        canvas.drawCircle(cx, cy, r * .58f, strokePaint)
+
+        for (i in 0 until 48) {
+            val angle = Math.toRadians((rotationDeg + i * 360.0 / 48.0))
+            val inner = r * .89f
+            val outer = if (i % 4 == 0) r * .985f else r * .94f
+            strokePaint.color = if (i % 4 == 0) {
+                android.graphics.Color.argb(36, 255, 255, 255)
+            } else {
+                android.graphics.Color.argb(14, 255, 255, 255)
+            }
+            strokePaint.strokeWidth = if (i % 4 == 0) 3f else 1.2f
+            val sx = cx + kotlin.math.cos(angle).toFloat() * inner
+            val sy = cy + kotlin.math.sin(angle).toFloat() * inner
+            val ex = cx + kotlin.math.cos(angle).toFloat() * outer
+            val ey = cy + kotlin.math.sin(angle).toFloat() * outer
+            canvas.drawLine(sx, sy, ex, ey, strokePaint)
+        }
     }
 }

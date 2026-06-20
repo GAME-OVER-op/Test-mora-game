@@ -1,37 +1,78 @@
 # GameSpace
 
-## Исправления v10 — Kotlin compile fix
+## Исправления v13 — полная оптимизация второго экрана
 
-Исправлена ошибка сборки:
+Прошёл второй экран не точечно, а по этапам: аудио, постоянные циклы, анимация, тяжёлые эффекты, жизненный цикл.
+
+## 1. Звук фоновой музыки
+
+Проблема: `bgm.ogg` — Vorbis/OGG. На некоторых Android-прошивках `MediaPlayer` может молчать, лагать или нестабильно loop-ить OGG.
+
+Что сделано:
+
+- оригинальный `bgm.ogg` оставлен в проекте как исходник;
+- добавлен Android-friendly вариант для воспроизведения:
 
 ```text
-MainActivity.kt:238:33 'val' cannot be reassigned
-MainActivity.kt:239:33 'val' cannot be reassigned
-MainActivity.kt:243:33 'val' cannot be reassigned
-MainActivity.kt:244:33 'val' cannot be reassigned
+bgm_loop.m4a
+AAC, 48 kHz, stereo
 ```
 
-Причина: внутри блока `MediaPlayer().apply { ... }` имена `videoWidth` и `videoHeight` резолвились не в наши переменные listener-а, а в read-only свойства `MediaPlayer.videoWidth` / `MediaPlayer.videoHeight`. Kotlin 2.4 справедливо ругался, что `val` нельзя переassign-ить.
+- `BackgroundMusic()` теперь воспроизводит `R.raw.bgm_loop`;
+- плеер создаётся только когда второй экран уже полностью готов (`LaunchStage.Ready`);
+- плеер освобождается через `DisposableEffect`;
+- добавлены `AudioAttributes` для нормального media audio output;
+- громкость стоит `1f, 1f`.
 
-Исправление:
+## 2. Лаги со временем
 
-```kotlin
-private var sourceVideoWidth = 0
-private var sourceVideoHeight = 0
+Проверены источники постоянной нагрузки:
+
+- polling батареи;
+- бесконечная Compose-анимация;
+- перерисовка Canvas через Compose;
+- тени `shadow()`;
+- тяжёлые эффекты при появлении экрана.
+
+Что сделано:
+
+- батарея больше не читается через повторный `registerReceiver(null, ...)` каждые N секунд;
+- батарея теперь обновляется event-driven через `BroadcastReceiver`;
+- время обновляется раз в минуту, а не постоянно;
+- убран `shadow()` с карточки выбранной игры;
+- центральная круговая анимация вынесена из Compose в отдельный Android `View` — `ReactorView`;
+- `ReactorView` рисует сам себя через `android.graphics.Canvas`;
+- анимация идёт через `Handler.postDelayed(..., 33L)` примерно 30 FPS;
+- при уходе View вызывается `handler.removeCallbacks(...)`, чтобы не оставалось фоновых циклов.
+
+## 3. Порядок запуска экранов
+
+Оставлена строгая последовательность:
+
+1. только intro-видео;
+2. intro полностью удаляется;
+3. короткая пауза на освобождение `TextureView/MediaPlayer`;
+4. создаётся второй экран;
+5. второй экран плавно выходит;
+6. только после этого запускается музыка и круговая анимация.
+
+## 4. Видео
+
+`start_animation.mp4` не перекодируется и не меняется.
+Отображение остаётся правильное:
+
+```text
+TextureView + MediaPlayer + Matrix center-crop
 ```
 
-и дальше используются именно эти имена:
+## Текущий стек
 
-```kotlin
-sourceVideoWidth = w
-sourceVideoHeight = h
-sourceVideoWidth = mediaPlayer.videoWidth
-sourceVideoHeight = mediaPlayer.videoHeight
+```text
+Android Gradle Plugin: 9.1.0
+Gradle: 9.4.1
+Kotlin / Compose Compiler Plugin: 2.4.0
+compileSdk: 36
+targetSdk: 36
+buildTools: 36.0.0
+Compose BOM: 2026.04.01
 ```
-
-Остальное:
-
-- AGP 9 built-in Kotlin без `org.jetbrains.kotlin.android`;
-- Compose Compiler Plugin оставлен;
-- оригинальное `start_animation.mp4` не перекодируется;
-- отображение видео: `TextureView + MediaPlayer + Matrix center-crop`.
