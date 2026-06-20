@@ -1,5 +1,7 @@
 package com.mora.gamespace
 
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -11,13 +13,12 @@ import android.media.MediaPlayer
 import android.net.Uri
 import android.os.BatteryManager
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.TextureView
 import android.view.Surface as AndroidSurface
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
+import android.view.animation.LinearInterpolator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -655,18 +656,11 @@ private fun RoundDockButton(iconRes: Int, onClick: () -> Unit) {
 
 
 private class ReactorView(context: Context) : View(context) {
-    private val handler = Handler(Looper.getMainLooper())
-    private var rotationDeg = 0f
-    private var pulse = 1f
-    private var frame = 0
 
-    var animationsEnabled: Boolean = false
-        set(value) {
-            if (field == value) return
-            field = value
-            if (value) startLoop() else stopLoop()
-            invalidate()
-        }
+    // The static ring is drawn ONCE into a hardware layer. The visible motion comes from
+    // GPU-driven View.rotation + a subtle scale pulse via ObjectAnimator. This means onDraw
+    // is NOT called every frame, so there is no per-frame CPU cost and no thermal build-up
+    // that previously made the screen lag more and more over time.
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -674,34 +668,63 @@ private class ReactorView(context: Context) : View(context) {
         strokeCap = Paint.Cap.ROUND
     }
 
-    private val tick = object : Runnable {
-        override fun run() {
-            if (!animationsEnabled) return
-            rotationDeg = (rotationDeg + 0.55f) % 360f
-            frame++
-            pulse = 1f + kotlin.math.sin(frame / 24f) * 0.055f
-            invalidate()
-            handler.postDelayed(this, 33L) // ~30 FPS, stable and lighter than Compose recomposition every vsync
-        }
+    private var rotationAnimator: ObjectAnimator? = null
+    private var pulseAnimator: ValueAnimator? = null
+
+    init {
+        // Cache this view as a hardware layer so rotation/scale are pure GPU transforms.
+        setLayerType(LAYER_TYPE_HARDWARE, null)
     }
+
+    var animationsEnabled: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            if (value) startAnimators() else stopAnimators()
+        }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        if (animationsEnabled) startLoop()
+        if (animationsEnabled) startAnimators()
     }
 
     override fun onDetachedFromWindow() {
-        stopLoop()
+        stopAnimators()
         super.onDetachedFromWindow()
     }
 
-    private fun startLoop() {
-        handler.removeCallbacks(tick)
-        handler.post(tick)
+    private fun startAnimators() {
+        if (rotationAnimator == null) {
+            rotationAnimator = ObjectAnimator.ofFloat(this, View.ROTATION, 0f, 360f).apply {
+                duration = 22_000L
+                interpolator = LinearInterpolator()
+                repeatCount = ValueAnimator.INFINITE
+                repeatMode = ValueAnimator.RESTART
+            }
+        }
+        if (pulseAnimator == null) {
+            pulseAnimator = ValueAnimator.ofFloat(0.97f, 1.03f).apply {
+                duration = 2600L
+                interpolator = LinearInterpolator()
+                repeatCount = ValueAnimator.INFINITE
+                repeatMode = ValueAnimator.REVERSE
+                addUpdateListener {
+                    val sc = it.animatedValue as Float
+                    scaleX = sc
+                    scaleY = sc
+                }
+            }
+        }
+        rotationAnimator?.let { if (!it.isStarted) it.start() }
+        pulseAnimator?.let { if (!it.isStarted) it.start() }
     }
 
-    private fun stopLoop() {
-        handler.removeCallbacks(tick)
+    private fun stopAnimators() {
+        rotationAnimator?.cancel()
+        pulseAnimator?.cancel()
+        rotation = 0f
+        scaleX = 1f
+        scaleY = 1f
     }
 
     override fun onDraw(canvas: android.graphics.Canvas) {
@@ -713,7 +736,7 @@ private class ReactorView(context: Context) : View(context) {
         fillPaint.color = android.graphics.Color.argb(168, 10, 13, 17)
         canvas.drawCircle(cx, cy, r, fillPaint)
 
-        fillPaint.color = android.graphics.Color.argb((46 * pulse).toInt().coerceIn(28, 60), 255, 32, 61)
+        fillPaint.color = android.graphics.Color.argb(46, 255, 32, 61)
         canvas.drawCircle(cx, cy, r * .84f, fillPaint)
 
         strokePaint.color = android.graphics.Color.argb(36, 255, 75, 82)
@@ -721,7 +744,7 @@ private class ReactorView(context: Context) : View(context) {
         canvas.drawCircle(cx, cy, r * .58f, strokePaint)
 
         for (i in 0 until 48) {
-            val angle = Math.toRadians((rotationDeg + i * 360.0 / 48.0))
+            val angle = Math.toRadians(i * 360.0 / 48.0)
             val inner = r * .89f
             val outer = if (i % 4 == 0) r * .985f else r * .94f
             strokePaint.color = if (i % 4 == 0) {
