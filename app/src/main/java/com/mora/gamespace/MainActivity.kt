@@ -56,7 +56,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -198,16 +197,16 @@ private fun StartAnimation(modifier: Modifier = Modifier, onFinished: () -> Unit
     AndroidView(
         modifier = modifier.fillMaxSize().background(Color.Black),
         factory = { viewContext ->
-            TextureView(viewContext).apply textureView@ {
-                isOpaque = true
-                surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+            val textureView = TextureView(viewContext)
+            textureView.isOpaque = true
+            textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
                     private var player: MediaPlayer? = null
                     private var surface: AndroidSurface? = null
                     private var finished = false
                     private var videoWidth = 0
                     private var videoHeight = 0
 
-                    fun applyCenterCropTransform(viewWidth: Int = this@textureView.width, viewHeight: Int = this@textureView.height) {
+                    fun applyCenterCropTransform(viewWidth: Int, viewHeight: Int) {
                         if (viewWidth <= 0 || viewHeight <= 0 || videoWidth <= 0 || videoHeight <= 0) return
 
                         // Correct GameSpace-style usage: keep the original video untouched,
@@ -225,7 +224,7 @@ private fun StartAnimation(modifier: Modifier = Modifier, onFinished: () -> Unit
                             setScale(scale, scale)
                             postTranslate(dx, dy)
                         }
-                        setTransform(matrix)
+                        textureView.setTransform(matrix)
                     }
 
                     override fun onSurfaceTextureAvailable(texture: android.graphics.SurfaceTexture, width: Int, height: Int) {
@@ -238,12 +237,12 @@ private fun StartAnimation(modifier: Modifier = Modifier, onFinished: () -> Unit
                             setOnVideoSizeChangedListener { _, w, h ->
                                 videoWidth = w
                                 videoHeight = h
-                                applyCenterCropTransform(this@textureView.width, this@textureView.height)
+                                applyCenterCropTransform(textureView.width, textureView.height)
                             }
                             setOnPreparedListener { mediaPlayer ->
                                 videoWidth = mediaPlayer.videoWidth
                                 videoHeight = mediaPlayer.videoHeight
-                                applyCenterCropTransform(this@textureView.width, this@textureView.height)
+                                applyCenterCropTransform(textureView.width, textureView.height)
                                 mediaPlayer.start()
                             }
                             setOnCompletionListener {
@@ -276,7 +275,7 @@ private fun StartAnimation(modifier: Modifier = Modifier, onFinished: () -> Unit
                         return true
                     }
                 }
-            }
+            textureView
         }
     )
 }

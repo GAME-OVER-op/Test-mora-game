@@ -1,54 +1,36 @@
 # GameSpace
 
-Каркас нового приложения GameSpace в стиле RedMagic Game Space.
+## Исправления v9
 
-## Исправления v8 — fix сборки AGP 9
+Исправлена вероятная причина `CompilationErrorException` после перехода на AGP 9 / built-in Kotlin.
 
-Ошибка GitHub Actions была из-за AGP 9 built-in Kotlin:
+В `StartAnimation()` я упростил код `TextureView`:
 
-```text
-The 'org.jetbrains.kotlin.android' plugin is no longer required for Kotlin support since AGP 9.0.
-Solution: Remove the 'org.jetbrains.kotlin.android' plugin
-```
-
-Исправлено:
-
-- удалён `org.jetbrains.kotlin.android` из root `build.gradle.kts`;
-- удалён `org.jetbrains.kotlin.android` из `app/build.gradle.kts`;
-- оставлен `org.jetbrains.kotlin.plugin.compose`, потому что Compose Compiler Plugin всё ещё нужен для Compose на Kotlin 2.x;
-- старый `android { kotlinOptions { ... } }` заменён на новый AGP 9 / built-in Kotlin DSL:
+- убрал нестабильный label receiver `textureView@`;
+- убрал default args, которые ссылались на receiver внутри локальной функции;
+- сделал явную переменную `val textureView = TextureView(viewContext)`;
+- исправил вызов transform на явный:
 
 ```kotlin
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-    }
-}
+textureView.setTransform(matrix)
 ```
+
+Также в v8 уже было исправлено:
+
+- удалён `org.jetbrains.kotlin.android`;
+- оставлен `org.jetbrains.kotlin.plugin.compose`;
+- `kotlinOptions` заменён на `kotlin { compilerOptions { ... } }`.
 
 Текущий стек:
 
 ```text
 Android Gradle Plugin: 9.1.0
-Gradle в GitHub Actions: 9.4.1
-Kotlin/Compose Compiler Plugin: 2.4.0
+Gradle: 9.4.1
+Kotlin / Compose Compiler Plugin: 2.4.0
 compileSdk: 36
 targetSdk: 36
 buildTools: 36.0.0
 Compose BOM: 2026.04.01
 ```
 
-## Видео
-
-Оригинальное `start_animation.mp4` не перекодируется и не меняется.
-Используется `TextureView + MediaPlayer + Matrix center-crop`.
-
-## GitHub Actions
-
-Workflow лежит тут:
-
-```text
-.github/workflows/build.yml
-```
-
-После загрузки в GitHub он собирает debug/release APK и кладёт их в artifact `GameSpace-apks`.
+Видео `start_animation.mp4` оригинальное, без перекодирования. Отображение — `TextureView + MediaPlayer + Matrix center-crop`.
