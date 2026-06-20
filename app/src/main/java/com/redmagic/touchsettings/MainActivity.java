@@ -269,8 +269,11 @@ public class MainActivity extends AppCompatActivity {
         row.setOrientation(LinearLayout.HORIZONTAL);
         LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        rowLp.topMargin = dp(6);
+        rowLp.topMargin = dp(8);
         row.setLayoutParams(rowLp);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setBackgroundResource(R.drawable.card_bg);
+        row.setPadding(dp(12), dp(10), dp(12), dp(10));
 
         EditText pkgEt = new EditText(this);
         pkgEt.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
@@ -278,7 +281,10 @@ public class MainActivity extends AppCompatActivity {
         pkgEt.setText(pkg);
         pkgEt.setTextColor(0xFFFFFFFF);
         pkgEt.setHintTextColor(0x66FFFFFF);
-        pkgEt.setTextSize(12);
+        pkgEt.setTextSize(14);
+        pkgEt.setTypeface(pkgEt.getTypeface(), android.graphics.Typeface.BOLD);
+        pkgEt.setShadowLayer(2f, 0f, 2f, 0xFF000000);
+        pkgEt.setBackgroundColor(0x00000000);
         pkgEt.setSingleLine(true);
         pkgEt.setTag("pkg");
 
@@ -287,8 +293,10 @@ public class MainActivity extends AppCompatActivity {
         valLp.setMarginStart(dp(8));
         valEt.setLayoutParams(valLp);
         valEt.setText(value);
-        valEt.setTextColor(0xFFFFFFFF);
-        valEt.setTextSize(12);
+        valEt.setTextColor(0xCCFFFFFF);
+        valEt.setTextSize(13);
+        valEt.setGravity(android.view.Gravity.CENTER);
+        valEt.setBackgroundColor(0x00000000);
         valEt.setSingleLine(true);
         valEt.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         valEt.setTag("val");
