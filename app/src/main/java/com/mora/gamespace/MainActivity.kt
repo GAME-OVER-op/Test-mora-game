@@ -203,21 +203,21 @@ private fun StartAnimation(modifier: Modifier = Modifier, onFinished: () -> Unit
                     private var player: MediaPlayer? = null
                     private var surface: AndroidSurface? = null
                     private var finished = false
-                    private var videoWidth = 0
-                    private var videoHeight = 0
+                    private var sourceVideoWidth = 0
+                    private var sourceVideoHeight = 0
 
                     fun applyCenterCropTransform(viewWidth: Int, viewHeight: Int) {
-                        if (viewWidth <= 0 || viewHeight <= 0 || videoWidth <= 0 || videoHeight <= 0) return
+                        if (viewWidth <= 0 || viewHeight <= 0 || sourceVideoWidth <= 0 || sourceVideoHeight <= 0) return
 
                         // Correct GameSpace-style usage: keep the original video untouched,
                         // and center-crop it at render time. This fills the display without
                         // distorting the frame and without re-encoding the MP4.
                         val scale = maxOf(
-                            viewWidth.toFloat() / videoWidth.toFloat(),
-                            viewHeight.toFloat() / videoHeight.toFloat(),
+                            viewWidth.toFloat() / sourceVideoWidth.toFloat(),
+                            viewHeight.toFloat() / sourceVideoHeight.toFloat(),
                         )
-                        val scaledWidth = videoWidth * scale
-                        val scaledHeight = videoHeight * scale
+                        val scaledWidth = sourceVideoWidth * scale
+                        val scaledHeight = sourceVideoHeight * scale
                         val dx = (viewWidth - scaledWidth) / 2f
                         val dy = (viewHeight - scaledHeight) / 2f
                         val matrix = Matrix().apply {
@@ -235,13 +235,13 @@ private fun StartAnimation(modifier: Modifier = Modifier, onFinished: () -> Unit
                             isLooping = false
                             setVolume(1f, 1f)
                             setOnVideoSizeChangedListener { _, w, h ->
-                                videoWidth = w
-                                videoHeight = h
+                                sourceVideoWidth = w
+                                sourceVideoHeight = h
                                 applyCenterCropTransform(textureView.width, textureView.height)
                             }
                             setOnPreparedListener { mediaPlayer ->
-                                videoWidth = mediaPlayer.videoWidth
-                                videoHeight = mediaPlayer.videoHeight
+                                sourceVideoWidth = mediaPlayer.videoWidth
+                                sourceVideoHeight = mediaPlayer.videoHeight
                                 applyCenterCropTransform(textureView.width, textureView.height)
                                 mediaPlayer.start()
                             }
