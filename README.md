@@ -1,25 +1,33 @@
-# GameSpace Control Center Preview
+# RedMagic Touch Settings (standalone)
 
-Вторая попытка. Это не `GameStrengthen` с левым меню, а preview для **Game Space Control Center / QS cards** — той панели, которая относится к `cc_tiles_game`, `cc_tools_game`, `control_center` и `ic_qs_*` ресурсам.
+Обычное Android-приложение, повторяющее экран «Регулировка параметров сенсорного экрана»
+из Game Space (`cn.nubia.gamelauncher`). Без плавающего окна — экран открывается сразу при запуске.
 
-Использованы реальные ресурсы из APK:
+## Что пишет
+Те же ключи `Settings.Global`, что и оригинальная панель:
 
-- `control_center_ing.png`
-- `control_center_dising.png`
-- `game_control_panel_for_card.png`
-- `red_magic_time_for_card.png`
-- `more_select_for_card.png`
-- `userdefine_*`
-- `ic_qs_*`
-- `game_space_window_bg.png`
+| Параметр | Ключ |
+|---|---|
+| Частота дискретизации | `NubiaperformanceTouchSampleRate` |
+| Чувствительность | `NubiaperformanceTouchSen` |
+| Плавность | `NubiaperformanceTouchFollow` |
+| Стабилизация | `NubiaperformanceTouchMicroSensitive` |
+| Гироскоп | `NubiaperformanceGyroSen` |
+| Защита от касаний | `TouchProtectOpen` |
 
-Это визуальный preview, не системный overlay.
+Формат значения: `<package>@<value>` когда задан пакет игры.
+Запись выполняется через root (`su -c settings put global ...`).
 
-## Сборка GitHub
+> Примечание: на кастоме запись этих Settings-ключей может ничего не делать —
+> реально применяет их системный сервис ZTE/nubia (TP game partition). Позже это
+> заменим на прямую запись kernel-нод тачскрина.
 
-1. Загрузи содержимое этой папки в новый репозиторий.
-2. Actions → `Build Android Debug APK` → Run workflow.
-3. Скачай artifact `GameSpaceControlCenterPreview-debug-apk`.
-4. Установи `app-debug.apk`.
+## Сборка
+Сборка автоматическая на GitHub Actions (`.github/workflows/build.yml`).
+После push в `main`/`master` APK появится в Actions → Artifacts → `app-debug`.
 
-Тап по правой/левой половине экрана меняет сторону панели.
+Локально:
+```
+gradle assembleDebug
+```
+(используется Gradle 8.7 + AGP 8.5.2, JDK 17, compileSdk 34)

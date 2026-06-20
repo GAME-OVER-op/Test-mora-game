@@ -1,0 +1,453 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="@color/game_bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Target package + root hint -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/target_package_label"
+            android:textColor="@color/white"
+            android:alpha="0.7"
+            android:textSize="13sp" />
+
+        <EditText
+            android:id="@+id/target_package"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/pill_unselected"
+            android:hint="@string/target_package_hint"
+            android:textColorHint="#80FFFFFF"
+            android:textColor="@color/white"
+            android:inputType="text"
+            android:padding="12dp"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/root_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/root_required"
+            android:textColor="@color/accent"
+            android:textSize="12sp" />
+
+        <!-- ================= TOUCH ADJUST PANEL ================= -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="15dp"
+            android:background="@drawable/panel_bg">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:gravity="start|center_vertical"
+                android:background="@drawable/panel_header_bg"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:text="@string/touch_adjust"
+                android:textColor="@color/white"
+                android:alpha="0.85"
+                android:textSize="15sp" />
+
+            <!-- sample rate -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:layout_marginTop="18dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/touch_sample_rate"
+                    android:textColor="@color/white"
+                    android:alpha="0.5"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/sample_high"
+                    android:layout_width="120dp"
+                    android:layout_height="54dp"
+                    android:gravity="center"
+                    android:background="@drawable/pill_bg"
+                    android:text="@string/touch_sample_rate_high"
+                    android:textColor="@color/white"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/sample_ultra"
+                    android:layout_width="120dp"
+                    android:layout_height="54dp"
+                    android:layout_marginStart="10dp"
+                    android:gravity="center"
+                    android:background="@drawable/pill_bg"
+                    android:text="@string/touch_sample_rate_ultra"
+                    android:textColor="@color/white"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- sensitivity slider -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:paddingStart="16dp"
+                android:text="@string/touch_sensitive"
+                android:textColor="@color/white"
+                android:alpha="0.5"
+                android:textSize="14sp" />
+
+            <SeekBar
+                android:id="@+id/seek_sensitive"
+                android:layout_width="match_parent"
+                android:layout_height="30dp"
+                android:layout_marginTop="6dp"
+                android:max="4"
+                android:progress="2"
+                android:paddingStart="22dp"
+                android:paddingEnd="22dp"
+                android:progressDrawable="@drawable/seekbar_progress"
+                android:thumb="@drawable/seekbar_thumb" />
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="22dp"
+                android:paddingEnd="22dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:text="@string/touch_sensitive_down"
+                    android:textColor="@color/white"
+                    android:alpha="0.5"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:text="@string/touch_sensitive_up"
+                    android:textColor="@color/white"
+                    android:alpha="0.5"
+                    android:textSize="11sp" />
+            </RelativeLayout>
+
+            <!-- follow slider -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:paddingStart="16dp"
+                android:text="@string/touch_follow"
+                android:textColor="@color/white"
+                android:alpha="0.5"
+                android:textSize="14sp" />
+
+            <SeekBar
+                android:id="@+id/seek_follow"
+                android:layout_width="match_parent"
+                android:layout_height="30dp"
+                android:layout_marginTop="6dp"
+                android:max="4"
+                android:progress="2"
+                android:paddingStart="22dp"
+                android:paddingEnd="22dp"
+                android:progressDrawable="@drawable/seekbar_progress"
+                android:thumb="@drawable/seekbar_thumb" />
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="22dp"
+                android:paddingEnd="22dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:text="@string/touch_follow_down"
+                    android:textColor="@color/white"
+                    android:alpha="0.5"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:text="@string/touch_follow_up"
+                    android:textColor="@color/white"
+                    android:alpha="0.5"
+                    android:textSize="11sp" />
+            </RelativeLayout>
+
+            <!-- micro sensitivity slider -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:paddingStart="16dp"
+                android:text="@string/micro_sensitivity"
+                android:textColor="@color/white"
+                android:alpha="0.5"
+                android:textSize="14sp" />
+
+            <SeekBar
+                android:id="@+id/seek_micro"
+                android:layout_width="match_parent"
+                android:layout_height="30dp"
+                android:layout_marginTop="6dp"
+                android:max="4"
+                android:progress="2"
+                android:paddingStart="22dp"
+                android:paddingEnd="22dp"
+                android:progressDrawable="@drawable/seekbar_progress"
+                android:thumb="@drawable/seekbar_thumb" />
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:paddingStart="22dp"
+                android:paddingEnd="22dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:layout_toStartOf="@+id/micro_up_label"
+                    android:text="@string/micro_sensitivity_decrease_instruction_text"
+                    android:textColor="@color/white"
+                    android:alpha="0.5"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/micro_up_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:text="@string/micro_sensitivity_increase_instruction_text"
+                    android:textColor="@color/white"
+                    android:alpha="0.5"
+                    android:textSize="11sp" />
+            </RelativeLayout>
+        </LinearLayout>
+
+        <!-- ================= GYRO PANEL ================= -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="15dp"
+            android:background="@drawable/panel_bg">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:gravity="start|center_vertical"
+                android:background="@drawable/panel_header_bg"
+                android:paddingStart="16dp"
+                android:text="@string/gyro_title"
+                android:textColor="@color/white"
+                android:alpha="0.85"
+                android:textSize="15sp" />
+
+            <!-- gyro X -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:text="@string/gyro_x"
+                    android:textColor="@color/white"
+                    android:alpha="0.5"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/gyro_x_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:text="100%"
+                    android:textColor="@color/white"
+                    android:textSize="14sp" />
+            </RelativeLayout>
+
+            <SeekBar
+                android:id="@+id/seek_gyro_x"
+                android:layout_width="match_parent"
+                android:layout_height="30dp"
+                android:layout_marginTop="6dp"
+                android:max="200"
+                android:progress="100"
+                android:paddingStart="22dp"
+                android:paddingEnd="22dp"
+                android:progressDrawable="@drawable/seekbar_progress"
+                android:thumb="@drawable/seekbar_thumb" />
+
+            <!-- gyro Y -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:text="@string/gyro_y"
+                    android:textColor="@color/white"
+                    android:alpha="0.5"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/gyro_y_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:text="100%"
+                    android:textColor="@color/white"
+                    android:textSize="14sp" />
+            </RelativeLayout>
+
+            <SeekBar
+                android:id="@+id/seek_gyro_y"
+                android:layout_width="match_parent"
+                android:layout_height="30dp"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="16dp"
+                android:max="200"
+                android:progress="100"
+                android:paddingStart="22dp"
+                android:paddingEnd="22dp"
+                android:progressDrawable="@drawable/seekbar_progress"
+                android:thumb="@drawable/seekbar_thumb" />
+        </LinearLayout>
+
+        <!-- ================= PREVENT ACCIDENTAL TOUCH PANEL ================= -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="15dp"
+            android:layout_marginBottom="20dp"
+            android:background="@drawable/panel_bg">
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/panel_header_bg"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_centerVertical="true"
+                    android:layout_toStartOf="@+id/prevent_touch_switch"
+                    android:layout_alignParentStart="true">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingStart="16dp"
+                        android:text="@string/touch_protection"
+                        android:textColor="@color/white"
+                        android:alpha="0.85"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingStart="16dp"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/touch_protection_prompt"
+                        android:textColor="@color/white"
+                        android:alpha="0.5"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/prevent_touch_switch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_centerVertical="true"
+                    android:layout_alignParentEnd="true"
+                    android:layout_marginEnd="16dp" />
+            </RelativeLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="18dp"
+                android:layout_marginBottom="18dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
+
+                <TextView
+                    android:id="@+id/range_small"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="44dp"
+                    android:gravity="center"
+                    android:background="@drawable/pill_bg"
+                    android:text="@string/touch_protection_small"
+                    android:textColor="@color/white"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/range_middle"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="10dp"
+                    android:gravity="center"
+                    android:background="@drawable/pill_bg"
+                    android:text="@string/touch_protection_middle"
+                    android:textColor="@color/white"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/range_big"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="10dp"
+                    android:gravity="center"
+                    android:background="@drawable/pill_bg"
+                    android:text="@string/touch_protection_big"
+                    android:textColor="@color/white"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

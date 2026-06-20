@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Регулировка сенсора</string>
+
+    <!-- target package -->
+    <string name="target_package_label">Пакет игры (необязательно)</string>
+    <string name="target_package_hint">например com.mobile.legends</string>
+    <string name="root_required">Нужны root-права. Запись настроек выполняется через su.</string>
+
+    <!-- touch adjust panel -->
+    <string name="touch_adjust">Регулировка параметров сенсорного экрана</string>
+    <string name="touch_sample_rate">Частота дискретизации при касании</string>
+    <string name="touch_sample_rate_high">Высокая частота\nдискретизации</string>
+    <string name="touch_sample_rate_ultra">Сверхвысокая частота\nдискретизации</string>
+
+    <string name="touch_sensitive">Чувствительность</string>
+    <string name="touch_sensitive_down">Уменьшение ложных касаний</string>
+    <string name="touch_sensitive_up">Увеличение скорости</string>
+
+    <string name="touch_follow">Плавность</string>
+    <string name="touch_follow_down">Плавнее</string>
+    <string name="touch_follow_up">Отзывчивее</string>
+
+    <string name="micro_sensitivity">Стабилизация</string>
+    <string name="micro_sensitivity_decrease_instruction_text">Простая идентификация небольших проскальзываний</string>
+    <string name="micro_sensitivity_increase_instruction_text">Уменьшает дрожание экрана</string>
+
+    <!-- gyro panel -->
+    <string name="gyro_title">Гироскоп</string>
+    <string name="gyro_x">Горизонтальный поворот</string>
+    <string name="gyro_y">Вертикальный поворот</string>
+
+    <!-- prevent accidental touch panel -->
+    <string name="touch_protection">Защита от случайного касания краёв</string>
+    <string name="touch_protection_prompt">Снижает число случайных касаний у краёв экрана</string>
+    <string name="touch_protection_small">Малый диапазон</string>
+    <string name="touch_protection_middle">Средний диапазон</string>
+    <string name="touch_protection_big">Широкий диапазон</string>
+</resources>

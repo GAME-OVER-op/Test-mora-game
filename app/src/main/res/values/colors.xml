@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="game_bg">#FF0E0F15</color>
+    <color name="panel_bg">#FF1B1E29</color>
+    <color name="panel_header_bg">#FF222531</color>
+    <color name="pill_selected">#FF494F64</color>
+    <color name="pill_selected_stroke">#75FFFFFF</color>
+    <color name="pill_unselected">#FF252733</color>
+    <color name="pill_unselected_stroke">#FF3D4051</color>
+    <color name="seek_track">#FF343747</color>
+    <color name="accent">#FFE60012</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="tick">#FFD8D8D8</color>
+</resources>
