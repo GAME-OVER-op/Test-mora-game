@@ -16,6 +16,9 @@ import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer as VlcMediaPlayer
 import java.io.File
 import java.io.FileOutputStream
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import android.os.BatteryManager
 import android.os.Bundle
 import android.view.TextureView
@@ -198,20 +201,24 @@ private fun GameSpaceRoot() {
     }
 }
 
+private class VlcMusicController {
+    var libVlc: LibVLC? = null
+    var player: VlcMediaPlayer? = null
+}
+
 @Composable
 private fun BackgroundMusic(enabled: Boolean) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val controller = remember { VlcMusicController() }
 
-    // Background music is played through the VLC engine (libVLC), which carries its own
-    // FFmpeg-based decoders. This bypasses the device's system codecs entirely — exactly why
-    // the track plays in VLC but stays silent / laggy with the stock media stack on this ROM.
-    // The player is created only when the second screen is ready and fully torn down on dispose.
+    // Background music plays through the VLC engine (libVLC) with its own FFmpeg-based
+    // decoders, independent of the device's system codecs. Created only when the second
+    // screen is ready, fully torn down on dispose.
     DisposableEffect(enabled) {
         if (!enabled) {
             return@DisposableEffect onDispose { }
         }
-
-        // libVLC needs a real file path, so copy the bundled track to cache once.
         val trackFile = File(context.cacheDir, "bgm_loop.m4a")
         runCatching {
             if (!trackFile.exists() || trackFile.length() == 0L) {
@@ -220,29 +227,66 @@ private fun BackgroundMusic(enabled: Boolean) {
                 }
             }
         }
-
-        var libVlc: LibVLC? = null
-        var player: VlcMediaPlayer? = null
         runCatching {
             val vlc = LibVLC(context, arrayListOf("--no-video", "--audio-resampler=soxr"))
             val mp = VlcMediaPlayer(vlc)
             val media = Media(vlc, Uri.fromFile(trackFile)).apply {
-                // Loop the input "forever" without recreating the player.
                 addOption(":input-repeat=65535")
                 addOption(":no-video")
             }
             mp.media = media
             media.release()
-            mp.volume = 100
+            mp.volume = 0 // start silent; LaunchedEffect fades it in
             mp.play()
-            libVlc = vlc
-            player = mp
+            controller.libVlc = vlc
+            controller.player = mp
         }
-
         onDispose {
-            runCatching { player?.stop() }
-            runCatching { player?.release() }
-            runCatching { libVlc?.release() }
+            val mp = controller.player
+            val vlc = controller.libVlc
+            controller.player = null
+            controller.libVlc = null
+            runCatching { mp?.stop() }
+            runCatching { mp?.release() }
+            runCatching { vlc?.release() }
+        }
+    }
+
+    // Observe app foreground/background.
+    var inForeground by remember { mutableStateOf(true) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> inForeground = true
+                Lifecycle.Event.ON_STOP -> inForeground = false
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Smoothly fade music in on foreground and out (then pause) when hidden to background.
+    LaunchedEffect(enabled, inForeground) {
+        val mp = controller.player ?: return@LaunchedEffect
+        if (inForeground) {
+            runCatching { if (!mp.isPlaying) mp.play() }
+            var v = 0
+            while (v < 100) {
+                runCatching { mp.volume = v }
+                delay(26)
+                v += 10
+            }
+            runCatching { mp.volume = 100 }
+        } else {
+            var v = 100
+            while (v > 0) {
+                runCatching { mp.volume = v }
+                delay(40)
+                v -= 8
+            }
+            runCatching { mp.volume = 0 }
+            runCatching { mp.pause() }
         }
     }
 }
@@ -380,6 +424,8 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEn
                 )
         )
 
+        // Cooling fan sits BEHIND the cards/HUD (drawn first = lowest layer).
+        CoreReactor(Modifier.align(Alignment.Center).size(420.dp), animationsEnabled = animationsEnabled)
         TopHud(Modifier.align(Alignment.TopCenter))
         LeftGameRail(
             games = demoGames,
@@ -387,7 +433,6 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEn
             onSelected = { selectedIndex = it },
             modifier = Modifier.align(Alignment.CenterStart).padding(start = 34.dp, top = 34.dp),
         )
-        CoreReactor(Modifier.align(Alignment.Center).size(420.dp), animationsEnabled = animationsEnabled)
         SelectedGamePanel(
             game = selected,
             onLaunch = {
@@ -735,31 +780,56 @@ private class ReactorView(context: Context) : View(context) {
         val cy = height / 2f
         val r = kotlin.math.min(width, height) / 2f
 
-        fillPaint.color = android.graphics.Color.argb(168, 10, 13, 17)
-        canvas.drawCircle(cx, cy, r, fillPaint)
+        // --- Base disc (this whole view is layered UNDER the surrounding cards) ---
+        fillPaint.shader = null
+        fillPaint.color = android.graphics.Color.argb(150, 9, 11, 15)
+        canvas.drawCircle(cx, cy, r * 0.985f, fillPaint)
+        fillPaint.color = android.graphics.Color.argb(42, 255, 38, 64)
+        canvas.drawCircle(cx, cy, r * 0.80f, fillPaint)
 
-        fillPaint.color = android.graphics.Color.argb(46, 255, 32, 61)
-        canvas.drawCircle(cx, cy, r * .84f, fillPaint)
+        // --- Outer rim rings ---
+        strokePaint.shader = null
+        strokePaint.color = android.graphics.Color.argb(80, 255, 70, 80)
+        strokePaint.strokeWidth = r * 0.020f
+        canvas.drawCircle(cx, cy, r * 0.965f, strokePaint)
+        strokePaint.color = android.graphics.Color.argb(26, 255, 255, 255)
+        strokePaint.strokeWidth = r * 0.006f
+        canvas.drawCircle(cx, cy, r * 0.905f, strokePaint)
 
-        strokePaint.color = android.graphics.Color.argb(36, 255, 75, 82)
-        strokePaint.strokeWidth = 18f
-        canvas.drawCircle(cx, cy, r * .58f, strokePaint)
-
-        for (i in 0 until 48) {
-            val angle = Math.toRadians(i * 360.0 / 48.0)
-            val inner = r * .89f
-            val outer = if (i % 4 == 0) r * .985f else r * .94f
-            strokePaint.color = if (i % 4 == 0) {
-                android.graphics.Color.argb(36, 255, 255, 255)
-            } else {
-                android.graphics.Color.argb(14, 255, 255, 255)
-            }
-            strokePaint.strokeWidth = if (i % 4 == 0) 3f else 1.2f
-            val sx = cx + kotlin.math.cos(angle).toFloat() * inner
-            val sy = cy + kotlin.math.sin(angle).toFloat() * inner
-            val ex = cx + kotlin.math.cos(angle).toFloat() * outer
-            val ey = cy + kotlin.math.sin(angle).toFloat() * outer
-            canvas.drawLine(sx, sy, ex, ey, strokePaint)
+        // --- Fan blades ---
+        val blades = 13
+        val ri = r * 0.34f
+        val ro = r * 0.90f
+        val bladeShader = android.graphics.LinearGradient(
+            cx, cy - ro, cx, cy - ri,
+            android.graphics.Color.argb(185, 74, 82, 92),
+            android.graphics.Color.argb(120, 24, 28, 34),
+            android.graphics.Shader.TileMode.CLAMP,
+        )
+        for (i in 0 until blades) {
+            val deg = i * 360f / blades
+            canvas.save()
+            canvas.rotate(deg, cx, cy)
+            val path = android.graphics.Path()
+            // A tapered, slightly swept blade pointing "up" from the hub.
+            path.moveTo(cx - r * 0.040f, cy - ri)
+            path.quadTo(cx - r * 0.235f, cy - r * 0.60f, cx - r * 0.120f, cy - ro)
+            path.quadTo(cx + r * 0.005f, cy - ro - r * 0.028f, cx + r * 0.170f, cy - ro)
+            path.quadTo(cx + r * 0.080f, cy - r * 0.55f, cx + r * 0.050f, cy - ri)
+            path.close()
+            fillPaint.shader = bladeShader
+            canvas.drawPath(path, fillPaint)
+            fillPaint.shader = null
+            // leading-edge red highlight
+            strokePaint.color = android.graphics.Color.argb(70, 255, 116, 120)
+            strokePaint.strokeWidth = r * 0.006f
+            canvas.drawPath(path, strokePaint)
+            canvas.restore()
         }
+
+        // --- Hub ring (behind the center logo) ---
+        strokePaint.color = android.graphics.Color.argb(130, 38, 49, 58)
+        strokePaint.strokeWidth = r * 0.022f
+        canvas.drawCircle(cx, cy, ri * 0.98f, strokePaint)
     }
 }
