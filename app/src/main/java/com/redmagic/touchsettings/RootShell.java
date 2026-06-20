@@ -6,9 +6,7 @@ import java.io.InputStreamReader;
 
 /**
  * Minimal root helper. Runs commands via `su -c`.
- * NOTE: writing Settings.Global from a normal app requires root (WRITE_SECURE_SETTINGS).
- * This is a placeholder mechanism — later this can be replaced by writing kernel
- * touch-driver nodes directly instead of Settings keys.
+ * Writing Settings.Global requires root (or WRITE_SECURE_SETTINGS).
  */
 public final class RootShell {
 
@@ -18,7 +16,7 @@ public final class RootShell {
         return runOne("id").contains("uid=0");
     }
 
-    /** Runs a single command as root, returns combined stdout. */
+    /** Runs a single command as root, returns combined stdout+stderr. */
     public static String runOne(String command) {
         StringBuilder out = new StringBuilder();
         Process p = null;
@@ -45,8 +43,21 @@ public final class RootShell {
         return out.toString();
     }
 
-    /** Writes a Settings.Global value as root. */
+    /** Reads a Settings.Global value as root. Returns "" when unset. */
+    public static String getGlobal(String key) {
+        String r = runOne("settings get global " + key);
+        if (r == null) return "";
+        r = r.trim();
+        if (r.isEmpty() || r.equals("null") || r.startsWith("ERROR")) return "";
+        return r;
+    }
+
+    /**
+     * Writes a raw Settings.Global value as root.
+     * The value is single-quoted so '&', '+' and ',' are not interpreted by the shell.
+     */
     public static String putGlobal(String key, String value) {
-        return runOne("settings put global " + key + " '" + value + "'");
+        String safe = value.replace("'", "'\\''");
+        return runOne("settings put global " + key + " '" + safe + "'");
     }
 }
