@@ -11,6 +11,11 @@ import android.graphics.Paint
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
+import org.videolan.libvlc.LibVLC
+import org.videolan.libvlc.Media
+import org.videolan.libvlc.MediaPlayer as VlcMediaPlayer
+import java.io.File
+import java.io.FileOutputStream
 import android.os.BatteryManager
 import android.os.Bundle
 import android.view.TextureView
@@ -197,46 +202,47 @@ private fun GameSpaceRoot() {
 private fun BackgroundMusic(enabled: Boolean) {
     val context = LocalContext.current
 
-    // Background music is AAC-LC (.m4a), which Android decodes in hardware on virtually all
-    // devices. The previous Vorbis/OGG track was the real cause: it was silent on some
-    // devices and its software decode loaded the main thread, which showed up as lag while
-    // the music was on. Player is created only when the second screen is ready.
+    // Background music is played through the VLC engine (libVLC), which carries its own
+    // FFmpeg-based decoders. This bypasses the device's system codecs entirely — exactly why
+    // the track plays in VLC but stays silent / laggy with the stock media stack on this ROM.
+    // The player is created only when the second screen is ready and fully torn down on dispose.
     DisposableEffect(enabled) {
         if (!enabled) {
             return@DisposableEffect onDispose { }
         }
 
-        val player = MediaPlayer()
-        var released = false
+        // libVLC needs a real file path, so copy the bundled track to cache once.
+        val trackFile = File(context.cacheDir, "bgm_loop.m4a")
         runCatching {
-            val afd = context.resources.openRawResourceFd(R.raw.bgm_loop)
-            player.setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build()
-            )
-            player.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-            afd.close()
-            player.isLooping = true
-            player.setVolume(1f, 1f)
-            player.setOnErrorListener { _, _, _ ->
-                if (!released) {
-                    released = true
-                    runCatching { player.release() }
+            if (!trackFile.exists() || trackFile.length() == 0L) {
+                context.resources.openRawResource(R.raw.bgm_loop).use { input ->
+                    FileOutputStream(trackFile).use { output -> input.copyTo(output) }
                 }
-                true
             }
-            player.setOnPreparedListener { it.start() }
-            player.prepareAsync()
+        }
+
+        var libVlc: LibVLC? = null
+        var player: VlcMediaPlayer? = null
+        runCatching {
+            val vlc = LibVLC(context, arrayListOf("--no-video", "--audio-resampler=soxr"))
+            val mp = VlcMediaPlayer(vlc)
+            val media = Media(vlc, Uri.fromFile(trackFile)).apply {
+                // Loop the input "forever" without recreating the player.
+                addOption(":input-repeat=65535")
+                addOption(":no-video")
+            }
+            mp.media = media
+            media.release()
+            mp.volume = 100
+            mp.play()
+            libVlc = vlc
+            player = mp
         }
 
         onDispose {
-            if (!released) {
-                released = true
-                runCatching { player.stop() }
-                player.release()
-            }
+            runCatching { player?.stop() }
+            runCatching { player?.release() }
+            runCatching { libVlc?.release() }
         }
     }
 }

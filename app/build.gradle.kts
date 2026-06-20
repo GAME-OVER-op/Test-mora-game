@@ -15,6 +15,10 @@ android {
         versionCode = 1
         versionName = "0.1.0-skeleton"
         vectorDrawables.useSupportLibrary = true
+
+        // libVLC ships native decoders per-ABI. Target arm64 (RedMagic/Nubia) to keep the APK
+        // reasonable. Add "armeabi-v7a" here too if you need 32-bit device support.
+        ndk { abiFilters += listOf("arm64-v8a") }
     }
 
     signingConfigs {
@@ -71,6 +75,10 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+
+    // VLC engine embedded as the audio decoder. It bundles its own codecs (FFmpeg-based),
+    // so background music plays independently of the device's system media codecs.
+    implementation("org.videolan.android:libvlc-all:3.6.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
