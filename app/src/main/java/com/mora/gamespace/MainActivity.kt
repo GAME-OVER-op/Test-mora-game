@@ -107,69 +107,89 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private enum class LaunchStage {
+    IntroVideo,
+    DisposeIntro,
+    PanelEntering,
+    Ready,
+}
+
 @Composable
 private fun GameSpaceRoot() {
-    var introVisible by remember { mutableStateOf(true) }
-    var introExiting by remember { mutableStateOf(false) }
+    var launchStage by remember { mutableStateOf(LaunchStage.IntroVideo) }
     var bgmEnabled by remember { mutableStateOf(true) }
 
-    // Не создаём MediaPlayer фоновой музыки во время intro: это убирает фризы при старте.
-    BackgroundMusic(enabled = bgmEnabled && !introVisible)
+    // Строгая последовательность, чтобы не было наложения тяжёлых экранов:
+    // 1) только видео;
+    // 2) видео полностью удаляется из Compose/TextureView/MediaPlayer;
+    // 3) только потом создаётся панель;
+    // 4) музыка стартует только после завершения выхода панели.
+    BackgroundMusic(enabled = bgmEnabled && launchStage == LaunchStage.Ready)
 
-    val introAlpha by animateFloatAsState(
-        targetValue = if (introExiting) 0f else 1f,
-        animationSpec = tween(720, easing = FastOutSlowInEasing),
-        label = "introAlpha",
-    )
-    val introScale by animateFloatAsState(
-        targetValue = if (introExiting) 1.18f else 1f,
-        animationSpec = tween(720, easing = FastOutSlowInEasing),
-        label = "introScale",
-    )
-    val lobbyAlpha by animateFloatAsState(
-        targetValue = if (introExiting || !introVisible) 1f else 0f,
-        animationSpec = tween(720, easing = FastOutSlowInEasing),
-        label = "lobbyAlpha",
-    )
-    val lobbyScale by animateFloatAsState(
-        targetValue = if (introExiting || !introVisible) 1f else .965f,
-        animationSpec = tween(720, easing = FastOutSlowInEasing),
-        label = "lobbyScale",
-    )
-
-    LaunchedEffect(introExiting) {
-        if (introExiting) {
-            delay(760)
-            introVisible = false
+    LaunchedEffect(launchStage) {
+        when (launchStage) {
+            LaunchStage.DisposeIntro -> {
+                delay(220) // даём TextureView/MediaPlayer полностью освободиться
+                launchStage = LaunchStage.PanelEntering
+            }
+            LaunchStage.PanelEntering -> {
+                delay(920) // длительность выхода панели
+                launchStage = LaunchStage.Ready
+            }
+            else -> Unit
         }
     }
 
+    val panelAlpha by animateFloatAsState(
+        targetValue = when (launchStage) {
+            LaunchStage.PanelEntering, LaunchStage.Ready -> 1f
+            else -> 0f
+        },
+        animationSpec = tween(860, easing = FastOutSlowInEasing),
+        label = "panelAlpha",
+    )
+    val panelScale by animateFloatAsState(
+        targetValue = when (launchStage) {
+            LaunchStage.PanelEntering, LaunchStage.Ready -> 1f
+            else -> .92f
+        },
+        animationSpec = tween(860, easing = FastOutSlowInEasing),
+        label = "panelScale",
+    )
+
     MaterialTheme {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
-            if (introExiting || !introVisible) {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            alpha = lobbyAlpha
-                            scaleX = lobbyScale
-                            scaleY = lobbyScale
+            when (launchStage) {
+                LaunchStage.IntroVideo -> {
+                    StartAnimation(
+                        onFinished = {
+                            if (launchStage == LaunchStage.IntroVideo) {
+                                launchStage = LaunchStage.DisposeIntro
+                            }
                         }
-                ) {
-                    GameLobby(bgmEnabled = bgmEnabled, onBgmToggle = { bgmEnabled = !bgmEnabled })
+                    )
                 }
-            }
-            if (introVisible) {
-                StartAnimation(
-                    modifier = Modifier.graphicsLayer {
-                        alpha = introAlpha
-                        scaleX = introScale
-                        scaleY = introScale
-                    },
-                    onFinished = {
-                        if (!introExiting) introExiting = true
-                    },
-                )
+                LaunchStage.DisposeIntro -> {
+                    // намеренно пустой чёрный кадр: intro уже удалён, панель ещё не создана
+                }
+                LaunchStage.PanelEntering,
+                LaunchStage.Ready -> {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                alpha = panelAlpha
+                                scaleX = panelScale
+                                scaleY = panelScale
+                            }
+                    ) {
+                        GameLobby(
+                            bgmEnabled = bgmEnabled,
+                            onBgmToggle = { bgmEnabled = !bgmEnabled },
+                            animationsEnabled = launchStage == LaunchStage.Ready,
+                        )
+                    }
+                }
             }
         }
     }
@@ -317,7 +337,7 @@ private val demoGames = listOf(
 )
 
 @Composable
-private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit) {
+private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEnabled: Boolean) {
     var selectedIndex by remember { mutableIntStateOf(0) }
     var fanEnabled by remember { mutableStateOf(true) }
     val selected = demoGames[selectedIndex]
@@ -350,7 +370,7 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit) {
             onSelected = { selectedIndex = it },
             modifier = Modifier.align(Alignment.CenterStart).padding(start = 34.dp, top = 34.dp),
         )
-        CoreReactor(Modifier.align(Alignment.Center).size(420.dp))
+        CoreReactor(Modifier.align(Alignment.Center).size(420.dp), animationsEnabled = animationsEnabled)
         SelectedGamePanel(
             game = selected,
             onLaunch = {
@@ -499,20 +519,22 @@ private fun LeftGameRail(games: List<GameCard>, selectedIndex: Int, onSelected: 
 }
 
 @Composable
-private fun CoreReactor(modifier: Modifier = Modifier) {
+private fun CoreReactor(modifier: Modifier = Modifier, animationsEnabled: Boolean) {
     val transition = rememberInfiniteTransition(label = "reactor")
-    val rotation by transition.animateFloat(
+    val animatedRotation by transition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(tween(22000, easing = LinearEasing), RepeatMode.Restart),
         label = "reactorRotation",
     )
-    val pulse by transition.animateFloat(
+    val animatedPulse by transition.animateFloat(
         initialValue = .92f,
         targetValue = 1.04f,
         animationSpec = infiniteRepeatable(tween(2600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "reactorPulse",
     )
+    val rotation = if (animationsEnabled) animatedRotation else 0f
+    val pulse = if (animationsEnabled) animatedPulse else 1f
 
     Box(modifier, contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
