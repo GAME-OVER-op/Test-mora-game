@@ -3,6 +3,7 @@ package com.mora.gamespace
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Matrix
+import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.BatteryManager
@@ -15,6 +16,11 @@ import android.view.WindowInsetsController
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -171,22 +177,35 @@ private fun GameSpaceRoot() {
 
 @Composable
 private fun BackgroundMusic(enabled: Boolean) {
-    if (!enabled) return
-
     val context = LocalContext.current
     val player = remember {
-        MediaPlayer.create(context, R.raw.bgm_loop).apply {
+        MediaPlayer.create(context, R.raw.bgm)?.apply {
+            setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build()
+            )
             isLooping = true
-            setVolume(0.36f, 0.36f)
+            setVolume(1f, 1f)
         }
     }
-    LaunchedEffect(Unit) {
-        if (!player.isPlaying) player.start()
+
+    LaunchedEffect(enabled, player) {
+        val mediaPlayer = player ?: return@LaunchedEffect
+        if (enabled) {
+            if (!mediaPlayer.isPlaying) mediaPlayer.start()
+        } else if (mediaPlayer.isPlaying) {
+            mediaPlayer.pause()
+        }
     }
+
     DisposableEffect(Unit) {
         onDispose {
-            runCatching { player.stop() }
-            player.release()
+            player?.let { mediaPlayer ->
+                runCatching { mediaPlayer.stop() }
+                mediaPlayer.release()
+            }
         }
     }
 }
@@ -212,17 +231,21 @@ private fun StartAnimation(modifier: Modifier = Modifier, onFinished: () -> Unit
                         // Correct GameSpace-style usage: keep the original video untouched,
                         // and center-crop it at render time. This fills the display without
                         // distorting the frame and without re-encoding the MP4.
-                        val scale = maxOf(
-                            viewWidth.toFloat() / sourceVideoWidth.toFloat(),
-                            viewHeight.toFloat() / sourceVideoHeight.toFloat(),
-                        )
-                        val scaledWidth = sourceVideoWidth * scale
-                        val scaledHeight = sourceVideoHeight * scale
-                        val dx = (viewWidth - scaledWidth) / 2f
-                        val dy = (viewHeight - scaledHeight) / 2f
+                        // TextureView by default stretches the decoded buffer to the view bounds.
+                        // To get correct center-crop without squashing, scale relative to that default fit.
+                        val viewAspect = viewWidth.toFloat() / viewHeight.toFloat()
+                        val videoAspect = sourceVideoWidth.toFloat() / sourceVideoHeight.toFloat()
+                        val scaleX: Float
+                        val scaleY: Float
+                        if (videoAspect > viewAspect) {
+                            scaleX = videoAspect / viewAspect
+                            scaleY = 1f
+                        } else {
+                            scaleX = 1f
+                            scaleY = viewAspect / videoAspect
+                        }
                         val matrix = Matrix().apply {
-                            setScale(scale, scale)
-                            postTranslate(dx, dy)
+                            setScale(scaleX, scaleY, viewWidth / 2f, viewHeight / 2f)
                         }
                         textureView.setTransform(matrix)
                     }
@@ -383,7 +406,7 @@ private fun rememberHudState(): State<HudState> {
     LaunchedEffect(Unit) {
         while (true) {
             state.value = readHudState(context)
-            delay(1000)
+            delay(10_000)
         }
     }
     return state
@@ -477,21 +500,35 @@ private fun LeftGameRail(games: List<GameCard>, selectedIndex: Int, onSelected: 
 
 @Composable
 private fun CoreReactor(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "reactor")
+    val rotation by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(22000, easing = LinearEasing), RepeatMode.Restart),
+        label = "reactorRotation",
+    )
+    val pulse by transition.animateFloat(
+        initialValue = .92f,
+        targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(tween(2600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "reactorPulse",
+    )
+
     Box(modifier, contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val r = size.minDimension / 2f
             drawCircle(Color(0xFF0A0D11).copy(alpha = .66f), r)
-            drawCircle(Color(0xFFFF203D).copy(alpha = .20f), r * .84f)
+            drawCircle(Color(0xFFFF203D).copy(alpha = .18f * pulse), r * .84f)
             drawCircle(Color(0xFFFF4B52).copy(alpha = .14f), r * .58f, style = Stroke(width = 18f))
-            repeat(64) { i ->
-                val a = Math.toRadians((i * 360.0 / 64.0))
+            repeat(48) { i ->
+                val a = Math.toRadians((rotation + i * 360.0 / 48.0))
                 val inner = r * .89f
                 val outer = if (i % 4 == 0) r * .985f else r * .94f
                 drawLine(
-                    Color.White.copy(alpha = if (i % 4 == 0) .14f else .055f),
+                    Color.White.copy(alpha = if (i % 4 == 0) .14f else .052f),
                     Offset(center.x + kotlin.math.cos(a).toFloat() * inner, center.y + kotlin.math.sin(a).toFloat() * inner),
                     Offset(center.x + kotlin.math.cos(a).toFloat() * outer, center.y + kotlin.math.sin(a).toFloat() * outer),
-                    strokeWidth = if (i % 4 == 0) 3f else 1.25f,
+                    strokeWidth = if (i % 4 == 0) 3f else 1.2f,
                 )
             }
         }
