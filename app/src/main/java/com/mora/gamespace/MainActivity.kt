@@ -1,19 +1,16 @@
 package com.mora.gamespace
 
 import android.content.Intent
-import android.content.IntentFilter
 import android.media.MediaPlayer
-import android.os.BatteryManager
 import android.net.Uri
 import android.os.Bundle
-import android.view.Surface as AndroidSurface
-import android.view.TextureView
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
+import android.widget.FrameLayout
+import android.widget.VideoView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -21,8 +18,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -47,7 +42,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.State
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -64,6 +58,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -112,21 +107,21 @@ private fun GameSpaceRoot() {
     var splashVisible by remember { mutableStateOf(true) }
     var bgmEnabled by remember { mutableStateOf(true) }
 
-    BackgroundMusic(enabled = bgmEnabled)
+    // Важно для плавного запуска: пока идёт intro-видео, не рисуем тяжёлый GameLobby
+    // и не запускаем фоновую музыку. Иначе декодер видео + Compose-анимации + audio
+    // стартуют одновременно и на телефоне появляются фризы.
+    BackgroundMusic(enabled = bgmEnabled && !splashVisible)
 
     LaunchedEffect(Unit) {
-        delay(3600)
+        delay(3400)
         splashVisible = false
     }
 
     MaterialTheme {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
-            GameLobby(bgmEnabled = bgmEnabled, onBgmToggle = { bgmEnabled = !bgmEnabled })
-            AnimatedVisibility(
-                visible = splashVisible,
-                enter = fadeIn(tween(250)),
-                exit = fadeOut(tween(700)),
-            ) {
+            if (!splashVisible) {
+                GameLobby(bgmEnabled = bgmEnabled, onBgmToggle = { bgmEnabled = !bgmEnabled })
+            } else {
                 StartAnimation(onFinished = { splashVisible = false })
             }
         }
@@ -162,43 +157,31 @@ private fun StartAnimation(onFinished: () -> Unit) {
     val context = LocalContext.current
     AndroidView(
         modifier = Modifier.fillMaxSize().background(Color.Black),
-        factory = { viewContext ->
-            TextureView(viewContext).apply {
-                isOpaque = true
-                scaleX = 1.55f
-                scaleY = 1.55f
-                surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-                    private var player: MediaPlayer? = null
-                    private var surface: AndroidSurface? = null
-
-                    override fun onSurfaceTextureAvailable(texture: android.graphics.SurfaceTexture, width: Int, height: Int) {
-                        surface = AndroidSurface(texture)
-                        player = MediaPlayer().apply {
-                            setDataSource(context, Uri.parse("android.resource://${context.packageName}/${R.raw.start_animation}"))
-                            setSurface(surface)
-                            isLooping = false
-                            setVolume(0f, 0f)
-                            setOnPreparedListener { it.start() }
-                            setOnCompletionListener { onFinished() }
-                            setOnErrorListener { _, _, _ ->
-                                onFinished()
-                                true
-                            }
-                            prepareAsync()
-                        }
+        factory = {
+            FrameLayout(it).apply {
+                setBackgroundColor(android.graphics.Color.BLACK)
+                val video = VideoView(it).apply {
+                    layoutParams = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        android.view.Gravity.CENTER,
+                    )
+                    setVideoURI(Uri.parse("android.resource://${context.packageName}/${R.raw.start_animation}"))
+                    setOnPreparedListener { mp ->
+                        mp.isLooping = false
+                        mp.setVolume(1f, 1f)
+                        // Лёгкий crop-fill без чрезмерного приближения.
+                        scaleX = 1.10f
+                        scaleY = 1.10f
+                        start()
                     }
-
-                    override fun onSurfaceTextureSizeChanged(texture: android.graphics.SurfaceTexture, width: Int, height: Int) = Unit
-                    override fun onSurfaceTextureUpdated(texture: android.graphics.SurfaceTexture) = Unit
-                    override fun onSurfaceTextureDestroyed(texture: android.graphics.SurfaceTexture): Boolean {
-                        runCatching { player?.stop() }
-                        player?.release()
-                        player = null
-                        surface?.release()
-                        surface = null
-                        return true
+                    setOnCompletionListener { onFinished() }
+                    setOnErrorListener { _, _, _ ->
+                        onFinished()
+                        true
                     }
                 }
+                addView(video)
             }
         }
     )
@@ -275,7 +258,7 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit) {
 
 @Composable
 private fun TopHud(modifier: Modifier = Modifier) {
-    val hud by rememberHudState()
+    val now = remember { SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()) }
     Row(
         modifier = modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -283,8 +266,8 @@ private fun TopHud(modifier: Modifier = Modifier) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("REDMAGIC", color = Color.White.copy(alpha = .9f), fontSize = 28.sp, letterSpacing = 7.sp, fontWeight = FontWeight.Light)
-            Text(hud.time, color = Color.White.copy(alpha = .75f), fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            BatteryMini(hud.batteryPercent)
+            Text(now, color = Color.White.copy(alpha = .75f), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            BatteryMini(21)
             Box(
                 Modifier.size(34.dp).clip(CircleShape).background(Brush.radialGradient(listOf(Color(0xFFFF6F86), Color(0xFF3A0B14))))
                     .border(1.dp, Color.White.copy(.3f), CircleShape),
@@ -296,30 +279,6 @@ private fun TopHud(modifier: Modifier = Modifier) {
             TopIconButton(R.drawable.chat_assistant_settings)
         }
     }
-}
-
-private data class HudState(val time: String, val batteryPercent: Int)
-
-@Composable
-private fun rememberHudState(): State<HudState> {
-    val context = LocalContext.current
-    val state = remember { mutableStateOf(readHudState(context)) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            state.value = readHudState(context)
-            delay(1000)
-        }
-    }
-    return state
-}
-
-private fun readHudState(context: android.content.Context): HudState {
-    val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-    val batteryIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-    val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
-    val scale = batteryIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
-    val percent = if (level >= 0 && scale > 0) ((level * 100f) / scale).toInt().coerceIn(0, 100) else 0
-    return HudState(time = time, batteryPercent = percent)
 }
 
 @Composable
@@ -338,23 +297,11 @@ private fun TopIconButton(iconRes: Int) {
 @Composable
 private fun BatteryMini(percent: Int) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        Image(
-            painterResource(batteryIconFor(percent)),
-            contentDescription = null,
-            modifier = Modifier.width(28.dp).height(14.dp),
-            contentScale = ContentScale.Fit,
-        )
+        Box(Modifier.width(26.dp).height(12.dp).border(1.dp, Color.White.copy(.6f), RoundedCornerShape(2.dp)).padding(2.dp)) {
+            Box(Modifier.fillMaxHeight().fillMaxWidth(percent / 100f).background(Color(0xFF70E6A0), RoundedCornerShape(1.dp)))
+        }
         Text("$percent%", color = Color.White.copy(alpha = .78f), fontSize = 12.sp)
     }
-}
-
-private fun batteryIconFor(percent: Int): Int = when {
-    percent <= 10 -> R.drawable.battery5
-    percent <= 30 -> R.drawable.battery20
-    percent <= 50 -> R.drawable.battery40
-    percent <= 70 -> R.drawable.battery60
-    percent <= 90 -> R.drawable.battery80
-    else -> R.drawable.battery100
 }
 
 @Composable
@@ -403,34 +350,32 @@ private fun LeftGameRail(games: List<GameCard>, selectedIndex: Int, onSelected: 
 private fun CoreReactor(modifier: Modifier = Modifier) {
     val transition = rememberInfiniteTransition(label = "reactor")
     val pulse by transition.animateFloat(
-        initialValue = .90f,
-        targetValue = 1.04f,
-        animationSpec = infiniteRepeatable(tween(2200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        initialValue = .88f,
+        targetValue = 1.03f,
+        animationSpec = infiniteRepeatable(tween(2400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "pulse"
     )
     val rotation by transition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(18000, easing = LinearEasing), RepeatMode.Restart),
+        animationSpec = infiniteRepeatable(tween(36000, easing = LinearEasing), RepeatMode.Restart),
         label = "rotation"
     )
     Box(modifier, contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxSize()) {
+        Canvas(Modifier.fillMaxSize().graphicsLayer { rotationZ = rotation }) {
             val r = size.minDimension / 2f
-            drawCircle(Color(0xFF0A0D11).copy(alpha = .66f), r)
-            drawCircle(Color(0xFFFF203D).copy(alpha = .17f * pulse), r * .84f)
-            drawCircle(Color(0xFFFF4B52).copy(alpha = .13f), r * .58f, style = Stroke(width = 18f))
-
-            // Smooth sliding effect: rotate only soft arcs/lines, not the whole layer.
-            repeat(64) { i ->
-                val a = Math.toRadians((rotation + i * 360.0 / 64.0))
-                val inner = r * .89f
-                val outer = if (i % 4 == 0) r * .985f else r * .94f
+            drawCircle(Color(0xFF0A0D11).copy(alpha = .70f), r)
+            drawCircle(Color(0xFFFF203D).copy(alpha = .18f * pulse), r * .84f)
+            drawCircle(Color(0xFFFF4B52).copy(alpha = .14f), r * .58f, style = Stroke(width = 18f))
+            repeat(96) { i ->
+                val a = Math.toRadians((i * 360.0 / 96.0))
+                val inner = r * .88f
+                val outer = if (i % 6 == 0) r * .98f else r * .93f
                 drawLine(
-                    Color.White.copy(alpha = if (i % 4 == 0) .14f else .055f),
+                    Color.White.copy(alpha = if (i % 6 == 0) .16f else .065f),
                     Offset(center.x + kotlin.math.cos(a).toFloat() * inner, center.y + kotlin.math.sin(a).toFloat() * inner),
                     Offset(center.x + kotlin.math.cos(a).toFloat() * outer, center.y + kotlin.math.sin(a).toFloat() * outer),
-                    strokeWidth = if (i % 4 == 0) 3f else 1.25f,
+                    strokeWidth = if (i % 6 == 0) 3.5f else 1.5f,
                 )
             }
         }
@@ -482,20 +427,9 @@ private fun BottomDock(
     onBgmToggle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.align(Alignment.BottomCenter),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            BottomTab(iconRes = R.drawable.gamelobby_icon, title = "Game Lobby", selected = true)
-            BottomTab(iconRes = R.drawable.top_indicator_expand, title = "Высокопроизвод", selected = false)
-        }
-        Row(
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 26.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    Row(modifier = modifier.fillMaxWidth().padding(horizontal = 310.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween) {
+        SkewDock()
+        Row(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
             RoundDockButton(iconRes = if (fanEnabled) R.drawable.cooling_fan_on else R.drawable.cooling_fan_off, onClick = onFanToggle)
             RoundDockButton(iconRes = if (bgmEnabled) R.drawable.bgm_on else R.drawable.bgm_off, onClick = onBgmToggle)
         }
@@ -503,23 +437,18 @@ private fun BottomDock(
 }
 
 @Composable
-private fun BottomTab(iconRes: Int, title: String, selected: Boolean) {
+private fun SkewDock() {
     Surface(
-        modifier = Modifier.width(if (selected) 178.dp else 198.dp).height(54.dp),
-        shape = RoundedCornerShape(18.dp),
-        color = Color(0xFF15171B).copy(alpha = .72f),
-        border = BorderStroke(1.dp, if (selected) Color(0xFFFF604A).copy(.68f) else Color.White.copy(.22f)),
+        modifier = Modifier.width(410.dp).height(56.dp),
+        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomStart = 4.dp, bottomEnd = 4.dp),
+        color = Color(0xFF15171B).copy(alpha = .68f),
+        border = BorderStroke(1.dp, Color.White.copy(.25f)),
     ) {
-        Row(
-            Modifier.fillMaxSize().background(
-                if (selected) Brush.horizontalGradient(listOf(Color(0xFF8C1820).copy(.82f), Color(0xFF1B1D22).copy(.76f)))
-                else Brush.horizontalGradient(listOf(Color(0xFF25282F).copy(.78f), Color(0xFF101217).copy(.72f)))
-            ).padding(horizontal = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Image(painterResource(iconRes), contentDescription = null, modifier = Modifier.size(30.dp), contentScale = ContentScale.Fit)
-            Text(title, color = if (selected) Color.White else Color.White.copy(.72f), fontSize = 12.sp, maxLines = 1)
+        Row(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color(0xFF7E151B).copy(.78f), Color(0xFF16181D).copy(.78f)))), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly) {
+            Image(painterResource(R.drawable.gamelobby_icon), contentDescription = null, modifier = Modifier.size(30.dp), contentScale = ContentScale.Fit)
+            Text("Game Lobby", color = Color.White, fontSize = 12.sp)
+            Image(painterResource(R.drawable.top_indicator_expand), contentDescription = null, modifier = Modifier.size(30.dp), contentScale = ContentScale.Fit)
+            Text("Высокопроизвод", color = Color.White.copy(.7f), fontSize = 12.sp, maxLines = 1)
         }
     }
 }
