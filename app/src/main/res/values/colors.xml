@@ -1,18 +1,3 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="game_bg">#FF0A0B12</color>
-    <color name="panel_bg">#FF182032</color>
-    <color name="panel_header_bg">#FF243150</color>
-    <color name="card_bg">#FF2D3D5C</color>
-    <color name="card_bg_selected">#FF3A4E76</color>
-    <color name="card_stroke">#FF6E84B0</color>
-    <color name="category_text">#FFE0E1E5</color>
-    <color name="pill_selected">#FF494F64</color>
-    <color name="pill_selected_stroke">#75FFFFFF</color>
-    <color name="pill_unselected">#FF252733</color>
-    <color name="pill_unselected_stroke">#FF3D4051</color>
-    <color name="seek_track">#FF343747</color>
-    <color name="accent">#FFE60012</color>
-    <color name="white">#FFFFFFFF</color>
-    <color name="tick">#FFD8D8D8</color>
+    <color name="ic_launcher_background">#050506</color>
 </resources>

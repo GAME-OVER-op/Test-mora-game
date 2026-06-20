@@ -1,1 +1,1 @@
-# Keep default; no obfuscation needed for this utility app.
+# Skeleton project. API/domain rules will be added after integration with Mora daemon.

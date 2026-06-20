@@ -1,33 +1,36 @@
-# RedMagic Touch Settings (standalone)
+# GameSpace
 
-Обычное Android-приложение, повторяющее экран «Регулировка параметров сенсорного экрана»
-из Game Space (`cn.nubia.gamelauncher`). Без плавающего окна — экран открывается сразу при запуске.
+Новый каркас приложения GameSpace в стиле RedMagic Game Space.
 
-## Что пишет
-Те же ключи `Settings.Global`, что и оригинальная панель:
+## Что уже есть
 
-| Параметр | Ключ |
-|---|---|
-| Частота дискретизации | `NubiaperformanceTouchSampleRate` |
-| Чувствительность | `NubiaperformanceTouchSen` |
-| Плавность | `NubiaperformanceTouchFollow` |
-| Стабилизация | `NubiaperformanceTouchMicroSensitive` |
-| Гироскоп | `NubiaperformanceGyroSen` |
-| Защита от касаний | `TouchProtectOpen` |
+- Landscape-only fullscreen лаунчер.
+- Название приложения: **GameSpace**.
+- Splash/start экран через `start_animation.mp4`.
+- Главный экран с обоями `gamespace_wallpaper.png`.
+- Левая панель игр.
+- Центральный Mora/RedMagic-style реактор.
+- Правая панель выбранной игры с кнопкой запуска.
+- Нижняя панель быстрых функций.
+- Ресурсы из `drawable-nodpi` уже добавлены в проект.
+- Manifest заранее содержит разрешения для будущего подключения Mora daemon/API, root/system-настроек и списка приложений.
+- GitHub Actions workflow собирает debug и release APK.
 
-Формат значения: `<package>@<value>` когда задан пакет игры.
-Запись выполняется через root (`su -c settings put global ...`).
+## Что пока НЕ подключено
 
-> Примечание: на кастоме запись этих Settings-ключей может ничего не делать —
-> реально применяет их системный сервис ZTE/nubia (TP game partition). Позже это
-> заменим на прямую запись kernel-нод тачскрина.
+- Mora daemon API.
+- `games.json` из основного проекта.
+- Реальные настройки CPU/GPU/fan/LED/touch.
+- Реальный список установленных игр.
 
-## Сборка
-Сборка автоматическая на GitHub Actions (`.github/workflows/build.yml`).
-После push в `main`/`master` APK появится в Actions → Artifacts → `app-debug`.
+Это специально: сначала каркас, потом подключение к основному проекту.
 
-Локально:
+## Сборка на GitHub
+
+Загрузи проект в репозиторий и запусти Actions. APK появятся в artifact `GameSpace-apks`.
+
+Локально, если установлен Gradle 8.7 и Android SDK:
+
+```bash
+gradle :app:assembleDebug
 ```
-gradle assembleDebug
-```
-(используется Gradle 8.7 + AGP 8.5.2, JDK 17, compileSdk 34)
