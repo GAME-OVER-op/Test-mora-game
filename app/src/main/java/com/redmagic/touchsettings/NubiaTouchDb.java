@@ -5,19 +5,17 @@ package com.redmagic.touchsettings;
  * (cn.nubia.gamelauncher) uses in
  * PerformanceUtils.saveOperationParamToDB / getOperationParamFromDB.
  *
- * Why this matters: GameSpace stores every Settings.Global touch key as a
- * comma-separated list of "<package>+<value>" entries (trailing comma after
- * each entry). Multi-value params (e.g. gyro X/Y) join their ints with '&'.
+ * GameSpace stores every touch/performance key as a comma-separated list of
+ * "<package>+<value>" entries (a trailing comma after each entry). Multi-value
+ * params (gyro X/Y) join their ints with '&'.
  *
  *   NubiaperformanceTouchSen = "com.game.a+2,com.game.b+-1,"
- *   NubiaperformanceGyroSen  = "com.game.a+120&80,"
+ *   NubiaperformanceMode     = "com.game.a+1,"
  *
- * The previous build wrote "<package>@<value>" which GameSpace cannot parse:
- * indexOf("+") fails, parseInt throws, and it falls back to the default value
- * (0 for the sensitivity sliders). That is exactly the "resets to 0" bug.
- *
- * This helper does a read-modify-write so other games' entries are preserved,
- * identical to the original implementation.
+ * The previous build wrote "<package>@<value>", which GameSpace cannot parse
+ * (indexOf("+") fails, parseInt throws, falls back to the default = 0). That was
+ * the "resets to 0" bug. This helper does a read-modify-write so other games'
+ * entries are preserved, identical to the original implementation.
  */
 public final class NubiaTouchDb {
 
@@ -27,25 +25,20 @@ public final class NubiaTouchDb {
     public static String encodeValue(int[] values) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < values.length; i++) {
-            if (i == 0) {
-                sb.append(values[0]);
-            } else {
-                sb.append('&').append(values[i]);
-            }
+            if (i == 0) sb.append(values[0]);
+            else sb.append('&').append(values[i]);
         }
         return sb.toString();
     }
 
-    /**
-     * Build the new Settings.Global string given the current stored string,
-     * target package and value ints. Mirrors saveOperationParamToDB byte-for-byte.
-     */
     public static String buildSaveString(String current, String pkg, int[] values) {
-        String value = encodeValue(values);
-        if (current == null) current = "";
+        return buildSaveString(current, pkg, encodeValue(values));
+    }
 
+    /** Same as above but for an already-encoded string value (e.g. display modes). */
+    public static String buildSaveString(String current, String pkg, String value) {
+        if (current == null) current = "";
         if (!current.isEmpty() && current.contains(pkg)) {
-            // Replace the existing entry for this package, keep the rest.
             String[] parts = current.split(",");
             for (String e : parts) {
                 if (!e.isEmpty() && e.contains(pkg)) {
@@ -62,10 +55,7 @@ public final class NubiaTouchDb {
         }
     }
 
-    /**
-     * Parse the stored string back to the int[] for a package.
-     * Mirrors getOperationParamFromDB + parserParamFromDB.
-     */
+    /** Parse the stored string back to int[] for a package (mirrors parserParamFromDB). */
     public static int[] parse(String raw, String pkg, int[] def) {
         if (raw == null || raw.isEmpty()) return def;
         if (raw.indexOf(pkg) == -1) return def;

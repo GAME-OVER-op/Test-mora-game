@@ -4,10 +4,7 @@ import java.io.DataOutputStream;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 
-/**
- * Minimal root helper. Runs commands via `su -c`.
- * Writing Settings.Global requires root (or WRITE_SECURE_SETTINGS).
- */
+/** Minimal root helper. Runs commands via `su`. Writing Settings.Global needs root. */
 public final class RootShell {
 
     private RootShell() {}
@@ -16,7 +13,7 @@ public final class RootShell {
         return runOne("id").contains("uid=0");
     }
 
-    /** Runs a single command as root, returns combined stdout+stderr. */
+    /** Runs a single command as root, returns combined stdout. */
     public static String runOne(String command) {
         StringBuilder out = new StringBuilder();
         Process p = null;
@@ -26,7 +23,6 @@ public final class RootShell {
             os.writeBytes(command + "\n");
             os.writeBytes("exit\n");
             os.flush();
-
             BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
             String line;
             while ((line = reader.readLine()) != null) {
@@ -36,9 +32,7 @@ public final class RootShell {
         } catch (Exception e) {
             return "ERROR: " + e.getMessage();
         } finally {
-            if (p != null) {
-                p.destroy();
-            }
+            if (p != null) p.destroy();
         }
         return out.toString();
     }
@@ -52,12 +46,15 @@ public final class RootShell {
         return r;
     }
 
-    /**
-     * Writes a raw Settings.Global value as root.
-     * The value is single-quoted so '&', '+' and ',' are not interpreted by the shell.
-     */
+    /** Writes a raw Settings.Global value as root (single-quoted to protect & + ,). */
     public static String putGlobal(String key, String value) {
         String safe = value.replace("'", "'\\''");
         return runOne("settings put global " + key + " '" + safe + "'");
+    }
+
+    public static int getGlobalInt(String key, int def) {
+        String r = getGlobal(key);
+        try { return r.isEmpty() ? def : Integer.parseInt(r.replaceAll("[^0-9-]", "")); }
+        catch (Exception e) { return def; }
     }
 }

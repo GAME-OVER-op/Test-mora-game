@@ -42,6 +42,105 @@
             android:textColor="@color/accent"
             android:textSize="12sp" />
 
+        <!-- ================= PERFORMANCE PANEL ================= -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="15dp"
+            android:background="@drawable/panel_bg">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:gravity="start|center_vertical"
+                android:background="@drawable/panel_header_bg"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:text="@string/perf_title"
+                android:textColor="@color/white"
+                android:alpha="0.85"
+                android:textSize="15sp" />
+
+            <!-- live CPU / GPU rings -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="18dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp">
+
+                <com.redmagic.touchsettings.RingView
+                    android:id="@+id/ring_cpu"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="150dp" />
+
+                <com.redmagic.touchsettings.RingView
+                    android:id="@+id/ring_gpu"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="150dp" />
+            </LinearLayout>
+
+            <!-- performance mode selector -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:paddingStart="16dp"
+                android:text="@string/perf_mode"
+                android:textColor="@color/white"
+                android:alpha="0.5"
+                android:textSize="14sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="10dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="18dp">
+
+                <TextView
+                    android:id="@+id/mode_balance"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="54dp"
+                    android:gravity="center"
+                    android:background="@drawable/pill_bg"
+                    android:text="@string/perf_mode_balance"
+                    android:textColor="@color/white"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/mode_performance"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="54dp"
+                    android:layout_marginStart="10dp"
+                    android:gravity="center"
+                    android:background="@drawable/pill_bg"
+                    android:text="@string/perf_mode_performance"
+                    android:textColor="@color/white"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/mode_beyond"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="54dp"
+                    android:layout_marginStart="10dp"
+                    android:gravity="center"
+                    android:background="@drawable/pill_bg"
+                    android:text="@string/perf_mode_beyond"
+                    android:textColor="@color/white"
+                    android:textSize="12sp" />
+            </LinearLayout>
+        </LinearLayout>
+
         <!-- ================= TOUCH ADJUST PANEL ================= -->
         <LinearLayout
             android:layout_width="match_parent"
@@ -225,22 +324,20 @@
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
                 android:paddingStart="22dp"
-                android:paddingEnd="22dp">
+                android:paddingEnd="22dp"
+                android:paddingBottom="18dp">
 
                 <TextView
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_alignParentStart="true"
-                    android:layout_toStartOf="@+id/micro_up_label"
                     android:text="@string/micro_sensitivity_decrease_instruction_text"
                     android:textColor="@color/white"
                     android:alpha="0.5"
                     android:textSize="11sp" />
 
                 <TextView
-                    android:id="@+id/micro_up_label"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_alignParentEnd="true"
@@ -251,7 +348,7 @@
             </RelativeLayout>
         </LinearLayout>
 
-        <!-- ================= GYRO PANEL ================= -->
+        <!-- ================= NETWORK PANEL ================= -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -265,189 +362,127 @@
                 android:gravity="start|center_vertical"
                 android:background="@drawable/panel_header_bg"
                 android:paddingStart="16dp"
-                android:text="@string/gyro_title"
+                android:paddingEnd="16dp"
+                android:text="@string/net_title"
                 android:textColor="@color/white"
                 android:alpha="0.85"
                 android:textSize="15sp" />
-
-            <!-- gyro X -->
-            <RelativeLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentStart="true"
-                    android:text="@string/gyro_x"
-                    android:textColor="@color/white"
-                    android:alpha="0.5"
-                    android:textSize="14sp" />
-
-                <TextView
-                    android:id="@+id/gyro_x_value"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentEnd="true"
-                    android:text="100%"
-                    android:textColor="@color/white"
-                    android:textSize="14sp" />
-            </RelativeLayout>
-
-            <SeekBar
-                android:id="@+id/seek_gyro_x"
-                android:layout_width="match_parent"
-                android:layout_height="30dp"
-                android:layout_marginTop="6dp"
-                android:max="200"
-                android:progress="100"
-                android:paddingStart="22dp"
-                android:paddingEnd="22dp"
-                android:progressDrawable="@drawable/seekbar_progress"
-                android:thumb="@drawable/seekbar_thumb" />
-
-            <!-- gyro Y -->
-            <RelativeLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentStart="true"
-                    android:text="@string/gyro_y"
-                    android:textColor="@color/white"
-                    android:alpha="0.5"
-                    android:textSize="14sp" />
-
-                <TextView
-                    android:id="@+id/gyro_y_value"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentEnd="true"
-                    android:text="100%"
-                    android:textColor="@color/white"
-                    android:textSize="14sp" />
-            </RelativeLayout>
-
-            <SeekBar
-                android:id="@+id/seek_gyro_y"
-                android:layout_width="match_parent"
-                android:layout_height="30dp"
-                android:layout_marginTop="6dp"
-                android:layout_marginBottom="16dp"
-                android:max="200"
-                android:progress="100"
-                android:paddingStart="22dp"
-                android:paddingEnd="22dp"
-                android:progressDrawable="@drawable/seekbar_progress"
-                android:thumb="@drawable/seekbar_thumb" />
-        </LinearLayout>
-
-        <!-- ================= PREVENT ACCIDENTAL TOUCH PANEL ================= -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginTop="15dp"
-            android:layout_marginBottom="20dp"
-            android:background="@drawable/panel_bg">
-
-            <RelativeLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/panel_header_bg"
-                android:paddingTop="8dp"
-                android:paddingBottom="8dp">
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:layout_centerVertical="true"
-                    android:layout_toStartOf="@+id/prevent_touch_switch"
-                    android:layout_alignParentStart="true">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:paddingStart="16dp"
-                        android:text="@string/touch_protection"
-                        android:textColor="@color/white"
-                        android:alpha="0.85"
-                        android:textSize="15sp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:paddingStart="16dp"
-                        android:layout_marginTop="2dp"
-                        android:text="@string/touch_protection_prompt"
-                        android:textColor="@color/white"
-                        android:alpha="0.5"
-                        android:textSize="12sp" />
-                </LinearLayout>
-
-                <androidx.appcompat.widget.SwitchCompat
-                    android:id="@+id/prevent_touch_switch"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_centerVertical="true"
-                    android:layout_alignParentEnd="true"
-                    android:layout_marginEnd="16dp" />
-            </RelativeLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginTop="18dp"
-                android:layout_marginBottom="18dp"
+                android:gravity="center_vertical"
                 android:paddingStart="16dp"
-                android:paddingEnd="16dp">
+                android:paddingEnd="16dp"
+                android:paddingTop="18dp"
+                android:paddingBottom="18dp">
 
-                <TextView
-                    android:id="@+id/range_small"
+                <LinearLayout
                     android:layout_width="0dp"
                     android:layout_weight="1"
-                    android:layout_height="44dp"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/net_wifi_low_latency"
+                        android:textColor="@color/white"
+                        android:textSize="14sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/net_wifi_low_latency_desc"
+                        android:textColor="@color/white"
+                        android:alpha="0.5"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/wifi_switch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ================= DISPLAY / LIGHT GAMMA PANEL ================= -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="15dp"
+            android:layout_marginBottom="15dp"
+            android:background="@drawable/panel_bg">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:gravity="start|center_vertical"
+                android:background="@drawable/panel_header_bg"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:text="@string/display_title"
+                android:textColor="@color/white"
+                android:alpha="0.85"
+                android:textSize="15sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:paddingStart="16dp"
+                android:text="@string/display_gamma"
+                android:textColor="@color/white"
+                android:alpha="0.5"
+                android:textSize="14sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="10dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="18dp">
+
+                <TextView
+                    android:id="@+id/gamma_default"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="54dp"
                     android:gravity="center"
                     android:background="@drawable/pill_bg"
-                    android:text="@string/touch_protection_small"
+                    android:text="@string/display_gamma_default"
                     android:textColor="@color/white"
                     android:textSize="12sp" />
 
                 <TextView
-                    android:id="@+id/range_middle"
+                    android:id="@+id/gamma_racing"
                     android:layout_width="0dp"
                     android:layout_weight="1"
-                    android:layout_height="44dp"
+                    android:layout_height="54dp"
                     android:layout_marginStart="10dp"
                     android:gravity="center"
                     android:background="@drawable/pill_bg"
-                    android:text="@string/touch_protection_middle"
+                    android:text="@string/display_gamma_racing"
                     android:textColor="@color/white"
                     android:textSize="12sp" />
 
                 <TextView
-                    android:id="@+id/range_big"
+                    android:id="@+id/gamma_shooting"
                     android:layout_width="0dp"
                     android:layout_weight="1"
-                    android:layout_height="44dp"
+                    android:layout_height="54dp"
                     android:layout_marginStart="10dp"
                     android:gravity="center"
                     android:background="@drawable/pill_bg"
-                    android:text="@string/touch_protection_big"
+                    android:text="@string/display_gamma_shooting"
                     android:textColor="@color/white"
                     android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
-
     </LinearLayout>
 </ScrollView>

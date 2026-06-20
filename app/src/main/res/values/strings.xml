@@ -7,6 +7,15 @@
     <string name="target_package_hint">например com.mobile.legends</string>
     <string name="root_required">Нужны root-права. Запись настроек выполняется через su.</string>
 
+    <!-- performance panel -->
+    <string name="perf_title">Производительность</string>
+    <string name="perf_mode">Режим производительности</string>
+    <string name="perf_mode_balance">Баланс</string>
+    <string name="perf_mode_performance">Производительность</string>
+    <string name="perf_mode_beyond">За пределами</string>
+    <string name="perf_cpu">ЦП</string>
+    <string name="perf_gpu">ГП</string>
+
     <!-- touch adjust panel -->
     <string name="touch_adjust">Регулировка параметров сенсорного экрана</string>
     <string name="touch_sample_rate">Частота дискретизации при касании</string>
@@ -25,15 +34,15 @@
     <string name="micro_sensitivity_decrease_instruction_text">Простая идентификация небольших проскальзываний</string>
     <string name="micro_sensitivity_increase_instruction_text">Уменьшает дрожание экрана</string>
 
-    <!-- gyro panel -->
-    <string name="gyro_title">Гироскоп</string>
-    <string name="gyro_x">Горизонтальный поворот</string>
-    <string name="gyro_y">Вертикальный поворот</string>
+    <!-- network panel -->
+    <string name="net_title">Сеть</string>
+    <string name="net_wifi_low_latency">Wi\u2011Fi с низкой задержкой</string>
+    <string name="net_wifi_low_latency_desc">Снижает задержку Wi\u2011Fi в играх</string>
 
-    <!-- prevent accidental touch panel -->
-    <string name="touch_protection">Защита от случайного касания краёв</string>
-    <string name="touch_protection_prompt">Снижает число случайных касаний у краёв экрана</string>
-    <string name="touch_protection_small">Малый диапазон</string>
-    <string name="touch_protection_middle">Средний диапазон</string>
-    <string name="touch_protection_big">Широкий диапазон</string>
+    <!-- display / light gamma panel -->
+    <string name="display_title">Показать</string>
+    <string name="display_gamma">Световая гамма</string>
+    <string name="display_gamma_default">Стандарт</string>
+    <string name="display_gamma_racing">Гонки</string>
+    <string name="display_gamma_shooting">Стрельба</string>
 </resources>
