@@ -197,31 +197,46 @@ private fun GameSpaceRoot() {
 private fun BackgroundMusic(enabled: Boolean) {
     val context = LocalContext.current
 
-    // One explicit player lifecycle per enabled session. No hidden remember player,
-    // no OGG decoder loop instability, no start before the second screen is ready.
+    // Background music is AAC-LC (.m4a), which Android decodes in hardware on virtually all
+    // devices. The previous Vorbis/OGG track was the real cause: it was silent on some
+    // devices and its software decode loaded the main thread, which showed up as lag while
+    // the music was on. Player is created only when the second screen is ready.
     DisposableEffect(enabled) {
         if (!enabled) {
             return@DisposableEffect onDispose { }
         }
 
         val player = MediaPlayer()
-        val afd = context.resources.openRawResourceFd(R.raw.bgm_loop)
-        player.setAudioAttributes(
-            AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_MEDIA)
-                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                .build()
-        )
-        player.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-        afd.close()
-        player.isLooping = true
-        player.setVolume(1f, 1f)
-        player.setOnPreparedListener { it.start() }
-        player.prepareAsync()
+        var released = false
+        runCatching {
+            val afd = context.resources.openRawResourceFd(R.raw.bgm_loop)
+            player.setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build()
+            )
+            player.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+            afd.close()
+            player.isLooping = true
+            player.setVolume(1f, 1f)
+            player.setOnErrorListener { _, _, _ ->
+                if (!released) {
+                    released = true
+                    runCatching { player.release() }
+                }
+                true
+            }
+            player.setOnPreparedListener { it.start() }
+            player.prepareAsync()
+        }
 
         onDispose {
-            runCatching { player.stop() }
-            player.release()
+            if (!released) {
+                released = true
+                runCatching { player.stop() }
+                player.release()
+            }
         }
     }
 }
@@ -657,10 +672,9 @@ private fun RoundDockButton(iconRes: Int, onClick: () -> Unit) {
 
 private class ReactorView(context: Context) : View(context) {
 
-    // The static ring is drawn ONCE into a hardware layer. The visible motion comes from
-    // GPU-driven View.rotation + a subtle scale pulse via ObjectAnimator. This means onDraw
-    // is NOT called every frame, so there is no per-frame CPU cost and no thermal build-up
-    // that previously made the screen lag more and more over time.
+    // The static ring is drawn ONCE into a hardware layer. The visible motion is ONLY a
+    // GPU-driven View.rotation (a fan spins; it does not "breathe", so there is no scale
+    // pulse). onDraw is NOT called every frame, so there is no per-frame CPU cost.
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -669,10 +683,9 @@ private class ReactorView(context: Context) : View(context) {
     }
 
     private var rotationAnimator: ObjectAnimator? = null
-    private var pulseAnimator: ValueAnimator? = null
 
     init {
-        // Cache this view as a hardware layer so rotation/scale are pure GPU transforms.
+        // Cache this view as a hardware layer so rotation is a pure GPU transform.
         setLayerType(LAYER_TYPE_HARDWARE, null)
     }
 
@@ -696,35 +709,18 @@ private class ReactorView(context: Context) : View(context) {
     private fun startAnimators() {
         if (rotationAnimator == null) {
             rotationAnimator = ObjectAnimator.ofFloat(this, View.ROTATION, 0f, 360f).apply {
-                duration = 22_000L
+                duration = 9_000L // равномерное вращение вентилятора
                 interpolator = LinearInterpolator()
                 repeatCount = ValueAnimator.INFINITE
                 repeatMode = ValueAnimator.RESTART
             }
         }
-        if (pulseAnimator == null) {
-            pulseAnimator = ValueAnimator.ofFloat(0.97f, 1.03f).apply {
-                duration = 2600L
-                interpolator = LinearInterpolator()
-                repeatCount = ValueAnimator.INFINITE
-                repeatMode = ValueAnimator.REVERSE
-                addUpdateListener {
-                    val sc = it.animatedValue as Float
-                    scaleX = sc
-                    scaleY = sc
-                }
-            }
-        }
         rotationAnimator?.let { if (!it.isStarted) it.start() }
-        pulseAnimator?.let { if (!it.isStarted) it.start() }
     }
 
     private fun stopAnimators() {
         rotationAnimator?.cancel()
-        pulseAnimator?.cancel()
         rotation = 0f
-        scaleX = 1f
-        scaleY = 1f
     }
 
     override fun onDraw(canvas: android.graphics.Canvas) {
