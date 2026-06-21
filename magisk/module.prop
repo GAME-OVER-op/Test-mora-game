@@ -1,0 +1,6 @@
+id=mora_perf_deamon
+name=Mora
+version=4.1
+versionCode=41
+author=t.me/GAME_OVER_op,4pda/Ggover
+description=Mora performance daemon + GameSpace app. Cooler, LEDs, power-saving and perf modes are controlled through system properties.

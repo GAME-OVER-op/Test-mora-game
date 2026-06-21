@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "GameSpace"
+rootProject.name = "mora"
 include(":app")

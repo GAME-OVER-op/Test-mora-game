@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<permissions>
+  <privapp-permissions package="com.mora.gamespace">
+    <permission name="android.permission.INTERNET"/>
+    <permission name="android.permission.ACCESS_NETWORK_STATE"/>
+    <permission name="android.permission.WRITE_SECURE_SETTINGS"/>
+    <permission name="android.permission.PACKAGE_USAGE_STATS"/>
+    <permission name="com.mora.gamespace.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"/>
+  </privapp-permissions>
+</permissions>

@@ -1,34 +1,34 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 android {
-    namespace = "com.mora.gamespace"
-    compileSdk = 36
-    buildToolsVersion = "36.0.0"
+    namespace = "com.example.aw22xxxconfig"
+    compileSdk = 34
+    buildToolsVersion = "34.0.0"
 
     defaultConfig {
-        applicationId = "com.mora.gamespace"
-        minSdk = 26
-        targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0-skeleton"
-        vectorDrawables.useSupportLibrary = true
+        applicationId = "com.example.aw22xxxconfig"
+        minSdk = 34
+        targetSdk = 34
+        versionCode = 10
+        versionName = "stage12"
 
-        // libVLC ships native decoders per-ABI. Target arm64 (RedMagic/Nubia) to keep the APK
-        // reasonable. Add "armeabi-v7a" here too if you need 32-bit device support.
-        ndk { abiFilters += listOf("arm64-v8a") }
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables.useSupportLibrary = true
     }
+
 
     signingConfigs {
         create("releaseDebugKey") {
-            val keystorePath = System.getenv("GAMESPACE_RELEASE_KEYSTORE")
-                ?: "${rootProject.layout.buildDirectory.get().asFile}/generated-debug-release.keystore"
+            val keystorePath = System.getenv("MORA_RELEASE_KEYSTORE")
+                ?: "${rootProject.buildDir}/generated-debug-release.keystore"
             storeFile = file(keystorePath)
-            storePassword = System.getenv("GAMESPACE_RELEASE_KEYSTORE_PASSWORD") ?: "android"
-            keyAlias = System.getenv("GAMESPACE_RELEASE_KEY_ALIAS") ?: "androiddebugkey"
-            keyPassword = System.getenv("GAMESPACE_RELEASE_KEY_PASSWORD") ?: "android"
+            storePassword = System.getenv("MORA_RELEASE_KEYSTORE_PASSWORD") ?: "android"
+            keyAlias = System.getenv("MORA_RELEASE_KEY_ALIAS") ?: "androiddebugkey"
+            keyPassword = System.getenv("MORA_RELEASE_KEY_PASSWORD") ?: "android"
             enableV1Signing = true
             enableV2Signing = true
             enableV3Signing = true
@@ -37,14 +37,13 @@ android {
     }
 
     buildTypes {
-        debug {
-            applicationIdSuffix = ".debug"
-            versionNameSuffix = "-debug"
-        }
         release {
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("releaseDebugKey")
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 
@@ -53,34 +52,47 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 
-    packaging { resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
-}
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.8"
+    }
 
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
     }
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.18.0")
-    implementation("androidx.activity:activity-compose:1.13.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    implementation("androidx.activity:activity-compose:1.9.0")
+    implementation("androidx.appcompat:appcompat:1.7.0")
 
-    implementation(platform("androidx.compose:compose-bom:2026.04.01"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.ui:ui:1.6.8")
+    implementation("androidx.compose.ui:ui-graphics:1.6.8")
+    implementation("androidx.compose.ui:ui-tooling-preview:1.6.8")
+    implementation("androidx.compose.material3:material3:1.2.1")
+    implementation("androidx.compose.material:material-icons-extended:1.6.8")
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
 
-    // VLC engine embedded as the audio decoder. It bundles its own codecs (FFmpeg-based),
-    // so background music plays independently of the device's system media codecs.
-    implementation("org.videolan.android:libvlc-all:3.6.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
-    debugImplementation("androidx.compose.ui:ui-tooling")
-    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter:1.0.0")
+
+    implementation("io.coil-kt:coil-compose:2.7.0")
+
+    debugImplementation("androidx.compose.ui:ui-tooling:1.6.8")
+    debugImplementation("androidx.compose.ui:ui-test-manifest:1.6.8")
 }

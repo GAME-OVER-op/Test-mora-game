@@ -1,0 +1,2 @@
+Place the built GameSpace APK here as: com.mora.gamespace.apk
+(package_magisk.sh / CI does this automatically from APK_PATH)
