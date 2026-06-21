@@ -4,7 +4,6 @@ use std::{
     collections::BTreeMap,
     fs,
     io,
-    io::Read,
     path::{Path, PathBuf},
 };
 
@@ -17,13 +16,6 @@ fn default_true() -> bool { true }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UserConfig {
-    /// Static API token used by local clients (Android app) to access /api/* endpoints.
-    ///
-    /// Web UI routes are disabled; unauthenticated requests will get an empty 404 response.
-    /// If this field is missing or empty, the daemon will generate one and persist it.
-    #[serde(default)]
-    pub api_token: String,
-
     /// Allow the daemon to post Android notifications via `cmd notification post`.
     /// If false, the daemon will not post any daemon notifications.
     #[serde(default = "default_true")]
@@ -51,7 +43,6 @@ pub struct UserConfig {
 impl Default for UserConfig {
     fn default() -> Self {
         Self {
-            api_token: String::new(),
             daemon_notifications: true,
             use_phone_cooler: true,
             battery_saver: BatterySaverConfig::default(),
@@ -429,52 +420,26 @@ pub fn load_or_init(path: &Path) -> UserConfig {
             Ok(mut cfg) => {
                 if let Err(e) = cfg.validate_and_normalize() {
                     eprintln!("CFG: invalid config: {} (reset to default)", e);
-                    let mut def = UserConfig::default();
-                    let _ = ensure_api_token(&mut def);
+                    let def = UserConfig::default();
                     let _ = write_config_atomic(path, &def);
                     def
                 } else {
-                    // Ensure token exists; persist if we generated it.
-                    if ensure_api_token(&mut cfg).unwrap_or(false) {
-                        let _ = write_config_atomic(path, &cfg);
-                    }
                     cfg
                 }
             }
             Err(e) => {
                 eprintln!("CFG: failed to parse config: {} (reset to default)", e);
-                let mut def = UserConfig::default();
-                let _ = ensure_api_token(&mut def);
+                let def = UserConfig::default();
                 let _ = write_config_atomic(path, &def);
                 def
             }
         },
         Err(_) => {
-            let mut def = UserConfig::default();
-            let _ = ensure_api_token(&mut def);
+            let def = UserConfig::default();
             let _ = write_config_atomic(path, &def);
             def
         }
     }
-}
-
-fn ensure_api_token(cfg: &mut UserConfig) -> io::Result<bool> {
-    if !cfg.api_token.trim().is_empty() {
-        return Ok(false);
-    }
-
-    // Generate a stable token (hex) from /dev/urandom. Rooted environment guarantees access.
-    let mut f = fs::File::open("/dev/urandom")?;
-    let mut buf = [0u8; 32];
-    f.read_exact(&mut buf)?;
-
-    let mut out = String::with_capacity(buf.len() * 2);
-    for b in buf {
-        use std::fmt::Write;
-        let _ = write!(&mut out, "{:02x}", b);
-    }
-    cfg.api_token = out;
-    Ok(true)
 }
 
 pub fn write_config_atomic(path: &Path, cfg: &UserConfig) -> io::Result<()> {
