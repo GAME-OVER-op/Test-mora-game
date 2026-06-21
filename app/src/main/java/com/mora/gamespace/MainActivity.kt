@@ -48,6 +48,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -455,7 +457,10 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEn
             selectedIndex = selectedIndex,
             onSelected = { selectedIndex = it },
             onAddGames = { showAddGames = true },
-            modifier = Modifier.align(Alignment.CenterStart).padding(start = 34.dp, top = 34.dp),
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 34.dp, top = 84.dp, bottom = 96.dp)
+                .fillMaxHeight(),
         )
         SelectedGamePanel(
             game = selected,
@@ -668,7 +673,12 @@ private fun LeftGameRail(
     onAddGames: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.width(250.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Column(
+        modifier = modifier
+            .width(250.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
         games.forEachIndexed { index, game ->
             Row(
                 modifier = Modifier.fillMaxWidth().height(74.dp).clickable { onSelected(index) },
