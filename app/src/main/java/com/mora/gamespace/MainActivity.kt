@@ -97,6 +97,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -197,6 +200,7 @@ private class VlcMusicController {
 @Composable
 private fun BackgroundMusic(enabled: Boolean) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val controller = remember { VlcMusicController() }
 
     // Background music plays through the VLC engine (libVLC) with its own FFmpeg-based decoders,
@@ -239,18 +243,41 @@ private fun BackgroundMusic(enabled: Boolean) {
         }
     }
 
-    // Smoothly fade in after the libVLC player is created. The player is still
-    // released by DisposableEffect when this composable leaves composition.
-    LaunchedEffect(enabled) {
-        val mp = controller.player ?: return@LaunchedEffect
-        runCatching { if (!mp.isPlaying) mp.play() }
-        var v = 0
-        while (v < 100) {
-            runCatching { mp.volume = v }
-            delay(26)
-            v += 10
+    var inForeground by remember { mutableStateOf(true) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> inForeground = true
+                Lifecycle.Event.ON_STOP -> inForeground = false
+                else -> {}
+            }
         }
-        runCatching { mp.volume = 100 }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Smoothly fade in on foreground, fade out + pause when the app is hidden to background.
+    LaunchedEffect(enabled, inForeground) {
+        val mp = controller.player ?: return@LaunchedEffect
+        if (inForeground) {
+            runCatching { if (!mp.isPlaying) mp.play() }
+            var v = 0
+            while (v < 100) {
+                runCatching { mp.volume = v }
+                delay(26)
+                v += 10
+            }
+            runCatching { mp.volume = 100 }
+        } else {
+            var v = 100
+            while (v > 0) {
+                runCatching { mp.volume = v }
+                delay(40)
+                v -= 8
+            }
+            runCatching { mp.volume = 0 }
+            runCatching { mp.pause() }
+        }
     }
 }
 

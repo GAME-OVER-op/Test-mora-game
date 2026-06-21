@@ -1,1 +1,1 @@
-# stage 1 - no custom rules yet
+# Skeleton project. API/domain rules will be added after integration with Mora daemon.
