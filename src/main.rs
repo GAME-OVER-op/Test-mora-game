@@ -97,20 +97,47 @@ fn battery_saver_disable_delay(override_dur: Duration) -> Duration {
 
 const SCREEN_OFF_CORE_SAVER_SECS: u64 = 30 * 60;
 
-/// Read the system performance mode from Settings.Global.
-/// `NubiaperformanceMode`: 1 = Баланс, 2 = Подъём, 3 = За пределами.
-fn read_nubia_perf_mode() -> Option<u8> {
+/// Read the per-game system performance mode from Settings.Global.
+///
+/// The GameSpace app stores `NubiaperformanceMode` as a comma-separated list of
+/// `<package>+<value>` entries (the exact stock Nubia encoding), e.g.
+/// `com.foo+2,com.bar+1,`. We therefore parse the entry for the foreground
+/// package instead of expecting a bare `1`/`2`/`3` (which never matched, so the
+/// mode was permanently stuck at 1 / Баланс).
+///
+/// 1 = Баланс, 2 = Подъём, 3 = За пределами. Returns `None` when there is no
+/// foreground game or no recognizable value, so the caller keeps the last mode.
+fn read_nubia_perf_mode(pkg: Option<&str>) -> Option<u8> {
+    let pkg = pkg?;
     let out = std::process::Command::new("settings")
         .args(["get", "global", "NubiaperformanceMode"])
         .output()
         .ok()?;
-    let s = String::from_utf8_lossy(&out.stdout);
-    match s.trim() {
-        "1" => Some(1),
-        "2" => Some(2),
-        "3" => Some(3),
-        _ => None,
+    let raw = String::from_utf8_lossy(&out.stdout);
+    let raw = raw.trim();
+    if raw.is_empty() || raw == "null" {
+        return None;
     }
+    // Find the "<pkg>+<value>" entry for this package and read its value.
+    for entry in raw.split(',') {
+        let entry = entry.trim();
+        if entry.is_empty() || !entry.contains(pkg) {
+            continue;
+        }
+        let plus = match entry.find('+') {
+            Some(i) => i,
+            None => continue,
+        };
+        // The value may be multi-int joined with '&'; perf mode is the first int.
+        let val = entry[plus + 1..].split('&').next().unwrap_or("").trim();
+        return match val {
+            "1" => Some(1),
+            "2" => Some(2),
+            "3" => Some(3),
+            _ => None,
+        };
+    }
+    None
 }
 
 /// Master cooler on/off, stored in the system property `persist.perf.fan.status`.
@@ -384,6 +411,12 @@ let mut s = shared.write().unwrap();
     let mut last_triggers_cfg: Option<crate::triggers::ActiveConfig> = None;
     let mut last_game_check = Instant::now();
     let game_check_every = Duration::from_secs(GAME_CHECK_EVERY);
+    // The master cooler switch (persist.perf.fan.status) is polled on its own
+    // short cadence, independent of screen state and the game check, so toggling
+    // the cooler off in the app stops the fan promptly (even with the screen
+    // off), instead of waiting up to GAME_CHECK_EVERY seconds and only on-screen.
+    let mut last_fan_poll = Instant::now();
+    let fan_poll_every = Duration::from_secs(2);
     let mut last_game_pkg: Option<String> = None;
     // Split-charge per-game config removed; keep a dormant default so the controller stays idle.
     let game_split_charge_cfg = crate::games::SplitChargeConfig::default();
@@ -430,6 +463,17 @@ let mut s = shared.write().unwrap();
             last_batt_check = now;
         }
 
+        // master cooler switch (persist.perf.fan.status) — polled continuously and
+        // independently of screen/game state so the app's on/off toggle takes
+        // effect quickly. When it flips off, the fan block below forces the fan to
+        // level 0 on this same loop iteration.
+        if now.duration_since(last_fan_poll) >= fan_poll_every {
+            if let Some(on) = read_fan_status_prop() {
+                cooler_enabled = on;
+            }
+            last_fan_poll = now;
+        }
+
         // screen
         let screen_on = if let Some(p) = &screen_probe {
             let on = raw_screen_on(p);
@@ -469,15 +513,13 @@ let mut s = shared.write().unwrap();
                 .map(|p| shared.read().unwrap().games.is_game(p))
                 .unwrap_or(false);
 
-            // Read system performance mode (Settings.Global NubiaperformanceMode).
-            if let Some(m) = read_nubia_perf_mode() {
+            // Read the per-game performance mode for the foreground app
+            // (Settings.Global NubiaperformanceMode, stored as "<pkg>+<value>,").
+            if let Some(m) = read_nubia_perf_mode(pkg.as_deref()) {
                 perf_mode = m;
             }
-
-            // Master cooler switch (persist.perf.fan.status). Off => cooler fully disabled.
-            if let Some(on) = read_fan_status_prop() {
-                cooler_enabled = on;
-            }
+            // NOTE: the master cooler switch (persist.perf.fan.status) is now polled
+            // continuously near the top of the loop, not here.
 
             // Triggers config (per-game). Active only for foreground game and screen ON.
             if let Some(mgr) = triggers.as_ref() {

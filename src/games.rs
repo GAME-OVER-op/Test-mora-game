@@ -14,6 +14,16 @@ use std::{
 /// reads them.
 pub const PROP_PREFIX: &str = "persist.mora.g.";
 
+/// Authoritative game-list property written by the app as a single
+/// comma-separated package list: `persist.mora.games = "pkg1,pkg2,..."`.
+///
+/// The per-game `persist.mora.g.<pkg>` props only exist once the user configures
+/// triggers, and the app cannot delete a system property, so those props cannot
+/// express "this game was removed". This list property is rewritten in full on
+/// every change, so additions AND removals propagate. A package counts as a
+/// registered game if it appears here OR has a `persist.mora.g.<pkg>` entry.
+pub const LIST_PROP: &str = "persist.mora.games";
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TriggerSideConfig {
     pub enabled: bool,
@@ -149,12 +159,20 @@ pub fn load_from_props() -> GamesRuntime {
     let mut pkg_set: HashSet<String> = HashSet::new();
     let mut triggers: HashMap<String, TriggersConfig> = HashMap::new();
     let mut driver_pkgs: Vec<String> = Vec::new();
+    let mut list_val = String::new();
 
     for line in all.lines() {
         let (key, val) = match parse_getprop_line(line) {
             Some(kv) => kv,
             None => continue,
         };
+        // Authoritative game list (single comma-separated property). Note this
+        // key does NOT start with PROP_PREFIX ("persist.mora.g.") because it has
+        // no trailing dot, so it is matched explicitly here.
+        if key == LIST_PROP {
+            list_val = val;
+            continue;
+        }
         let pkg_raw = match key.strip_prefix(PROP_PREFIX) {
             Some(p) => p,
             None => continue,
@@ -167,6 +185,20 @@ pub fn load_from_props() -> GamesRuntime {
         pkg_set.insert(pkg.clone());
         triggers.insert(pkg.clone(), cfg);
         driver_pkgs.push(pkg);
+    }
+
+    // Merge in packages from the authoritative comma-separated list. These are
+    // registered games even when they have no trigger property yet (no triggers
+    // configured) -- this is what makes game mode / the in-game cooler baseline /
+    // the per-game performance mode engage for a freshly added game.
+    for raw in list_val.split(',') {
+        let pkg = sanitize_pkg(raw);
+        if pkg.is_empty() {
+            continue;
+        }
+        if pkg_set.insert(pkg.clone()) {
+            driver_pkgs.push(pkg);
+        }
     }
 
     driver_pkgs.sort();

@@ -511,6 +511,11 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEn
                             NubiaSettings.KEY_STRENGTHEN_LIST,
                             NubiaSettings.buildStrengthenList(newSelected),
                         )
+                        // Mirror the list into the daemon's authoritative game-list
+                        // property so newly added games activate game mode / the
+                        // in-game cooler baseline / per-game performance mode even
+                        // before any triggers are configured.
+                        MoraGames.register(newSelected)
                     }
                     rebuildGames()
                 }

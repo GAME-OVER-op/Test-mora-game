@@ -6,19 +6,67 @@ allow magisk sysfs dir { search open read getattr }
 allow magisk sysfs file { open read write getattr ioctl }
 allow magisk sysfs lnk_file { read getattr }
 
-# --- app: read EVERY system property (cooler/led/saver/perf state) ---
+# ===========================================================================
+# GameSpace app domain.
+# The app is shipped in /system/priv-app, so on modern Android it runs in the
+# priv_app SELinux domain (NOT untrusted_app). We cover BOTH domains so the
+# app works whether it is installed via the module (priv_app) or sideloaded
+# as a normal APK (untrusted_app).
+# ===========================================================================
+
+# --- priv_app (module / priv-app install) ---
+allow priv_app property_type file { open read getattr map }
+allow priv_app_all property_type file { open read getattr map }
+allow priv_app default_prop property_service set
+allow priv_app_all default_prop property_service set
+allow priv_app sysfs dir { search open read getattr }
+allow priv_app sysfs file { open read write getattr }
+allow priv_app sysfs lnk_file { read getattr }
+allow priv_app_all sysfs dir { search open read getattr }
+allow priv_app_all sysfs file { open read write getattr }
+allow priv_app_all sysfs lnk_file { read getattr }
+
+# --- untrusted_app (sideloaded APK fallback) ---
 allow untrusted_app property_type file { open read getattr map }
 allow untrusted_app_all property_type file { open read getattr map }
-
-# --- app: SET the mora/perf system properties (cooler, leds, saver, games) ---
-# Custom persist.perf.* / persist.mora.* props fall under default_prop.
 allow untrusted_app default_prop property_service set
 allow untrusted_app_all default_prop property_service set
-
-# --- app: read perf sysfs nodes (cpu/gpu freq, fan, leds) ---
 allow untrusted_app sysfs dir { search open read getattr }
-allow untrusted_app sysfs file { open read getattr }
+allow untrusted_app sysfs file { open read write getattr }
 allow untrusted_app sysfs lnk_file { read getattr }
 allow untrusted_app_all sysfs dir { search open read getattr }
-allow untrusted_app_all sysfs file { open read getattr }
+allow untrusted_app_all sysfs file { open read write getattr }
 allow untrusted_app_all sysfs lnk_file { read getattr }
+
+# ===========================================================================
+# Vendor-specific sysfs node types (verified on device with `magiskpolicy --live`).
+# The fan and GPU-clock nodes are NOT labeled generic `sysfs`; they carry their
+# own vendor types, so the generic `sysfs` allows above do NOT cover them and the
+# reads were denied (cooler/GPU freq unreadable) until these were added:
+#   /sys/kernel/fan/{fan_enable,fan_speed_level}   -> sysfs_fan
+#   /sys/class/kgsl/kgsl-3d0/gpuclk                -> vendor_sysfs_kgsl_gpuclk
+#   /sys/class/kgsl/kgsl-3d0/max_gpuclk            -> vendor_sysfs_kgsl
+# (CPU scaling_cur_freq is sysfs_devices_system_cpu, already permitted.)
+# ===========================================================================
+
+# --- daemon (magisk): control fan + read GPU clocks ---
+allow magisk sysfs_fan dir { search open read getattr }
+allow magisk sysfs_fan file { open read write getattr ioctl }
+allow magisk vendor_sysfs_kgsl_gpuclk dir { search open read getattr }
+allow magisk vendor_sysfs_kgsl_gpuclk file { open read write getattr }
+allow magisk vendor_sysfs_kgsl dir { search open read getattr }
+allow magisk vendor_sysfs_kgsl file { open read write getattr }
+
+# --- app (priv_app + untrusted_app fallback): read fan + GPU clock state ---
+allow priv_app sysfs_fan file { open read getattr }
+allow priv_app_all sysfs_fan file { open read getattr }
+allow priv_app vendor_sysfs_kgsl_gpuclk file { open read getattr }
+allow priv_app_all vendor_sysfs_kgsl_gpuclk file { open read getattr }
+allow priv_app vendor_sysfs_kgsl file { open read getattr }
+allow priv_app_all vendor_sysfs_kgsl file { open read getattr }
+allow untrusted_app sysfs_fan file { open read getattr }
+allow untrusted_app_all sysfs_fan file { open read getattr }
+allow untrusted_app vendor_sysfs_kgsl_gpuclk file { open read getattr }
+allow untrusted_app_all vendor_sysfs_kgsl_gpuclk file { open read getattr }
+allow untrusted_app vendor_sysfs_kgsl file { open read getattr }
+allow untrusted_app_all vendor_sysfs_kgsl file { open read getattr }

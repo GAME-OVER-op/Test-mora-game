@@ -9,8 +9,6 @@ use std::{
 
 pub const CONFIG_PATH: &str = "/data/adb/modules/gamespace/config/config.json";
 
-pub const GAMES_PATH: &str = "/data/adb/modules/gamespace/config/games.json";
-
 
 fn default_true() -> bool { true }
 
