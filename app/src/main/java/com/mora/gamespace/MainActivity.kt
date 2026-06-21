@@ -26,7 +26,13 @@ import android.view.animation.LinearInterpolator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -53,6 +59,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -77,6 +85,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -388,7 +398,7 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEn
     suspend fun rebuildGames() {
         val apps = withContext(Dispatchers.IO) { InstalledApps.loadUserApps(context) }
         val pkgs = withContext(Dispatchers.IO) {
-            NubiaSettings.parseStrengthenPackages(RootShell.getGlobal(NubiaSettings.KEY_STRENGTHEN_LIST))
+            NubiaSettings.parseStrengthenPackages(NubiaIo.getGlobal(context, NubiaSettings.KEY_STRENGTHEN_LIST))
         }
         allApps = apps
         val byPkg = apps.associateBy { it.packageName }
@@ -460,7 +470,8 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEn
                 showAddGames = false
                 scope.launch {
                     withContext(Dispatchers.IO) {
-                        RootShell.putGlobal(
+                        NubiaIo.putGlobal(
+                            context,
                             NubiaSettings.KEY_STRENGTHEN_LIST,
                             NubiaSettings.buildStrengthenList(newSelected),
                         )
@@ -755,33 +766,33 @@ private fun RoundDockButton(iconRes: Int, onClick: () -> Unit) {
 }
 
 // ---------------------------------------------------------------------------
-// Root-backed settings helpers (off the main thread)
+// Settings I/O helpers (privileged, NO root — direct Settings.Global access).
 // ---------------------------------------------------------------------------
 
-private suspend fun applyPerGameInt(key: String, pkg: String, values: IntArray): String = withContext(Dispatchers.IO) {
-    val cur = RootShell.getGlobal(key)
-    RootShell.putGlobal(key, NubiaSettings.buildSaveString(cur, pkg, values))
+private suspend fun applyPerGameInt(context: Context, key: String, pkg: String, values: IntArray) = withContext(Dispatchers.IO) {
+    val cur = NubiaIo.getGlobal(context, key)
+    NubiaIo.putGlobal(context, key, NubiaSettings.buildSaveString(cur, pkg, values))
 }
 
-private suspend fun applyPerGameStr(key: String, pkg: String, value: String): String = withContext(Dispatchers.IO) {
-    val cur = RootShell.getGlobal(key)
-    RootShell.putGlobal(key, NubiaSettings.buildSaveString(cur, pkg, value))
+private suspend fun applyPerGameStr(context: Context, key: String, pkg: String, value: String) = withContext(Dispatchers.IO) {
+    val cur = NubiaIo.getGlobal(context, key)
+    NubiaIo.putGlobal(context, key, NubiaSettings.buildSaveString(cur, pkg, value))
 }
 
-private suspend fun applyGlobalValue(key: String, value: String): String = withContext(Dispatchers.IO) {
-    RootShell.putGlobal(key, value)
+private suspend fun applyGlobalValue(context: Context, key: String, value: String) = withContext(Dispatchers.IO) {
+    NubiaIo.putGlobal(context, key, value)
 }
 
-private suspend fun readPerGameInt(key: String, pkg: String, def: Int): Int = withContext(Dispatchers.IO) {
-    NubiaSettings.parse(RootShell.getGlobal(key), pkg, intArrayOf(def))[0]
+private suspend fun readPerGameInt(context: Context, key: String, pkg: String, def: Int): Int = withContext(Dispatchers.IO) {
+    NubiaSettings.parse(NubiaIo.getGlobal(context, key), pkg, intArrayOf(def))[0]
 }
 
-private suspend fun readPerGameStr(key: String, pkg: String, def: String): String = withContext(Dispatchers.IO) {
-    NubiaSettings.parseString(RootShell.getGlobal(key), pkg, def)
+private suspend fun readPerGameStr(context: Context, key: String, pkg: String, def: String): String = withContext(Dispatchers.IO) {
+    NubiaSettings.parseString(NubiaIo.getGlobal(context, key), pkg, def)
 }
 
-private suspend fun readGlobalIntValue(key: String, def: Int): Int = withContext(Dispatchers.IO) {
-    RootShell.getGlobalInt(key, def)
+private suspend fun readGlobalIntValue(context: Context, key: String, def: Int): Int = withContext(Dispatchers.IO) {
+    NubiaIo.getGlobalInt(context, key, def)
 }
 
 // ---------------------------------------------------------------------------
@@ -853,11 +864,19 @@ private fun AppRow(app: InstalledApp, isAdded: Boolean, onAdd: () -> Unit, onRem
 
 @Composable
 private fun Pill(text: String, active: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val border by animateColorAsState(if (active) Color(0xFFFF6A4A) else Color.White.copy(.16f), tween(200), label = "pillBorder")
+    val scale by animateFloatAsState(if (active) 1f else 0.97f, tween(180), label = "pillScale")
+    val bg = if (active) {
+        Brush.horizontalGradient(listOf(Color(0xFF8C1820), Color(0xFFC22A30)))
+    } else {
+        Brush.horizontalGradient(listOf(Color(0xFF181B21), Color(0xFF101318)))
+    }
     Box(
         modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (active) Color(0xFF8C1820) else Color(0xFF1A1D22))
-            .border(1.dp, if (active) Color(0xFFFF604A) else Color.White.copy(.16f), RoundedCornerShape(10.dp))
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(RoundedCornerShape(11.dp))
+            .background(bg)
+            .border(1.dp, border, RoundedCornerShape(11.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center,
@@ -895,29 +914,39 @@ private fun GameSettingsSheet(game: GameCard, onClose: () -> Unit) {
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.86f)
                 .graphicsLayer { translationY = (1f - p) * size.height }
                 .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
-                .background(Color(0xFF0C0E12))
-                .border(1.dp, Color.White.copy(.08f), RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
+                .background(Brush.verticalGradient(listOf(Color(0xFF170A0C), Color(0xFF0C0E12)), endY = 380f))
+                .border(1.dp, Color(0xFFFF5A4A).copy(.20f), RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
         ) {
-            Row(Modifier.fillMaxSize()) {
-                Column(
-                    Modifier.width(224.dp).fillMaxHeight().background(Color(0xFF080A0D)).padding(vertical = 22.dp, horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 16.dp)) {
-                        GameIcon(game, Modifier.size(38.dp).clip(RoundedCornerShape(9.dp)))
-                        Text(game.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    SettingsCategory.values().forEach { cat ->
-                        CategoryItem(cat.title, category == cat) { category = cat }
-                    }
+            Column(Modifier.fillMaxSize()) {
+                Box(Modifier.fillMaxWidth().height(26.dp), contentAlignment = Alignment.Center) {
+                    Box(
+                        Modifier.width(46.dp).height(4.dp).clip(CircleShape)
+                            .background(Brush.horizontalGradient(listOf(Color(0xFFFF5A4A), Color(0xFFB11E26))))
+                    )
                 }
-                Box(Modifier.weight(1f).fillMaxHeight().padding(28.dp)) {
-                    when (category) {
-                        SettingsCategory.Performance -> PerformanceTab(game.packageName)
-                        SettingsCategory.Touch -> TouchTab(game.packageName)
-                        SettingsCategory.Display -> DisplayTab(game.packageName)
-                        SettingsCategory.Network -> NetworkTab()
+                Row(Modifier.fillMaxWidth().weight(1f)) {
+                    Column(
+                        Modifier.width(224.dp).fillMaxHeight().background(Color(0xFF080A0D)).padding(vertical = 16.dp, horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 16.dp)) {
+                            GameIcon(game, Modifier.size(38.dp).clip(RoundedCornerShape(9.dp)))
+                            Text(game.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        SettingsCategory.values().forEach { cat ->
+                            CategoryItem(cat.title, category == cat) { category = cat }
+                        }
+                    }
+                    Box(Modifier.weight(1f).fillMaxHeight().padding(28.dp)) {
+                        Crossfade(targetState = category, animationSpec = tween(260), label = "catContent") { cat ->
+                            when (cat) {
+                                SettingsCategory.Performance -> PerformanceTab(game.packageName)
+                                SettingsCategory.Touch -> TouchTab(game.packageName)
+                                SettingsCategory.Display -> DisplayTab(game.packageName)
+                                SettingsCategory.Network -> NetworkTab()
+                            }
+                        }
                     }
                 }
             }
@@ -927,28 +956,32 @@ private fun GameSettingsSheet(game: GameCard, onClose: () -> Unit) {
 
 @Composable
 private fun CategoryItem(title: String, selected: Boolean, onClick: () -> Unit) {
+    val bg by animateColorAsState(if (selected) Color(0xFF24181A) else Color.Transparent, tween(220), label = "catBg")
+    val barH by animateFloatAsState(if (selected) 18f else 0f, tween(220), label = "catBar")
+    val textColor by animateColorAsState(if (selected) Color.White else Color.White.copy(.62f), tween(220), label = "catTxt")
     Box(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-            .background(if (selected) Color(0xFF1C1F26) else Color.Transparent)
+            .background(bg)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.width(3.dp).height(16.dp).background(if (selected) Color(0xFFFF604A) else Color.Transparent))
+            Box(Modifier.width(3.dp).height(barH.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFFFF5A4A)))
             Spacer(Modifier.width(10.dp))
-            Text(title, color = if (selected) Color.White else Color.White.copy(.66f), fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+            Text(title, color = textColor, fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
         }
     }
 }
 
 @Composable
 private fun PerformanceTab(pkg: String) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var mode by remember(pkg) { mutableIntStateOf(NubiaSettings.MODE_BALANCE) }
     var cpuKhz by remember { mutableStateOf(0f) }
     var gpuHz by remember { mutableStateOf(0f) }
 
-    LaunchedEffect(pkg) { mode = readPerGameInt(NubiaSettings.KEY_PERF_MODE, pkg, NubiaSettings.MODE_BALANCE) }
+    LaunchedEffect(pkg) { mode = readPerGameInt(context, NubiaSettings.KEY_PERF_MODE, pkg, NubiaSettings.MODE_BALANCE) }
     LaunchedEffect(Unit) {
         while (true) {
             cpuKhz = withContext(Dispatchers.IO) { FreqReader.cpuCur().toFloat() }
@@ -956,15 +989,15 @@ private fun PerformanceTab(pkg: String) {
             delay(1000)
         }
     }
-    val cpuAnim by animateFloatAsState(cpuKhz, tween(500), label = "cpuAnim")
-    val gpuAnim by animateFloatAsState(gpuHz, tween(500), label = "gpuAnim")
+    val cpuAnim by animateFloatAsState(cpuKhz, tween(900, easing = FastOutSlowInEasing), label = "cpuAnim")
+    val gpuAnim by animateFloatAsState(gpuHz, tween(900, easing = FastOutSlowInEasing), label = "gpuAnim")
 
     Column(verticalArrangement = Arrangement.spacedBy(22.dp)) {
         Text("Режим производительности", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Pill("Баланс", mode == NubiaSettings.MODE_BALANCE) { mode = NubiaSettings.MODE_BALANCE; scope.launch { applyPerGameInt(NubiaSettings.KEY_PERF_MODE, pkg, intArrayOf(NubiaSettings.MODE_BALANCE)) } }
-            Pill("Подъём", mode == NubiaSettings.MODE_BOOST) { mode = NubiaSettings.MODE_BOOST; scope.launch { applyPerGameInt(NubiaSettings.KEY_PERF_MODE, pkg, intArrayOf(NubiaSettings.MODE_BOOST)) } }
-            Pill("За пределами", mode == NubiaSettings.MODE_BEYOND) { mode = NubiaSettings.MODE_BEYOND; scope.launch { applyPerGameInt(NubiaSettings.KEY_PERF_MODE, pkg, intArrayOf(NubiaSettings.MODE_BEYOND)) } }
+            Pill("Баланс", mode == NubiaSettings.MODE_BALANCE) { mode = NubiaSettings.MODE_BALANCE; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_PERF_MODE, pkg, intArrayOf(NubiaSettings.MODE_BALANCE)) } }
+            Pill("Подъём", mode == NubiaSettings.MODE_BOOST) { mode = NubiaSettings.MODE_BOOST; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_PERF_MODE, pkg, intArrayOf(NubiaSettings.MODE_BOOST)) } }
+            Pill("За пределами", mode == NubiaSettings.MODE_BEYOND) { mode = NubiaSettings.MODE_BEYOND; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_PERF_MODE, pkg, intArrayOf(NubiaSettings.MODE_BEYOND)) } }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(46.dp), verticalAlignment = Alignment.CenterVertically) {
             PerfRing(mode, true, fmtGhz(cpuAnim), "ГГц", "CPU")
@@ -976,14 +1009,48 @@ private fun PerformanceTab(pkg: String) {
 
 @Composable
 private fun PerfRing(mode: Int, cpu: Boolean, valueText: String, unit: String, label: String) {
-    Box(Modifier.size(156.dp), contentAlignment = Alignment.Center) {
-        Image(painterResource(ringRes(mode, cpu)), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(label, color = Color.White.copy(.7f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Text(valueText, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
-            Text(unit, color = Color.White.copy(.7f), fontSize = 12.sp)
+    val accent = ringAccent(mode)
+    val infinite = rememberInfiniteTransition(label = "perfBob")
+    val bob by infinite.animateFloat(
+        initialValue = -5f,
+        targetValue = 5f,
+        animationSpec = infiniteRepeatable(animation = tween(1700, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
+        label = "perfBobY",
+    )
+    Box(Modifier.size(width = 168.dp, height = 210.dp), contentAlignment = Alignment.BottomCenter) {
+        Image(
+            painterResource(ringRes(mode, cpu)),
+            contentDescription = null,
+            modifier = Modifier.size(150.dp),
+            contentScale = ContentScale.Fit,
+        )
+        Text(
+            label,
+            color = Color.White.copy(.8f),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 66.dp),
+        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.align(Alignment.TopCenter).graphicsLayer { translationY = bob.dp.toPx() },
+        ) {
+            Text(
+                valueText,
+                color = Color.White,
+                fontSize = 36.sp,
+                fontWeight = FontWeight.ExtraBold,
+                style = TextStyle(shadow = Shadow(color = accent.copy(alpha = .95f), blurRadius = 30f)),
+            )
+            Text(unit, color = accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
     }
+}
+
+private fun ringAccent(mode: Int): Color = when (mode) {
+    NubiaSettings.MODE_BOOST -> Color(0xFFFFC53D)
+    NubiaSettings.MODE_BEYOND -> Color(0xFFFF5A4A)
+    else -> Color(0xFF4AA8FF)
 }
 
 private fun ringRes(mode: Int, cpu: Boolean): Int = when (mode) {
@@ -997,6 +1064,7 @@ private fun fmtMhz(hz: Float): String = if (hz <= 0f) "--" else (hz / 1_000_000f
 
 @Composable
 private fun TouchTab(pkg: String) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var sample by remember(pkg) { mutableIntStateOf(480) }
     var sen by remember(pkg) { mutableIntStateOf(0) }
@@ -1004,21 +1072,21 @@ private fun TouchTab(pkg: String) {
     var micro by remember(pkg) { mutableIntStateOf(0) }
 
     LaunchedEffect(pkg) {
-        sample = readPerGameInt(NubiaSettings.KEY_SAMPLE_RATE, pkg, 480)
-        sen = readPerGameInt(NubiaSettings.KEY_SENSITIVE, pkg, 0)
-        follow = readPerGameInt(NubiaSettings.KEY_FOLLOW, pkg, 0)
-        micro = readPerGameInt(NubiaSettings.KEY_MICRO, pkg, 0)
+        sample = readPerGameInt(context, NubiaSettings.KEY_SAMPLE_RATE, pkg, 480)
+        sen = readPerGameInt(context, NubiaSettings.KEY_SENSITIVE, pkg, 0)
+        follow = readPerGameInt(context, NubiaSettings.KEY_FOLLOW, pkg, 0)
+        micro = readPerGameInt(context, NubiaSettings.KEY_MICRO, pkg, 0)
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Text("Частота дискретизации касания", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Pill("Высокая · 480 Гц", sample == 480) { sample = 480; scope.launch { applyPerGameInt(NubiaSettings.KEY_SAMPLE_RATE, pkg, intArrayOf(480)) } }
-            Pill("Сверхвысокая · 960 Гц", sample == 960) { sample = 960; scope.launch { applyPerGameInt(NubiaSettings.KEY_SAMPLE_RATE, pkg, intArrayOf(960)) } }
+            Pill("Высокая · 480 Гц", sample == 480) { sample = 480; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_SAMPLE_RATE, pkg, intArrayOf(480)) } }
+            Pill("Сверхвысокая · 960 Гц", sample == 960) { sample = 960; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_SAMPLE_RATE, pkg, intArrayOf(960)) } }
         }
-        LevelSlider("Чувствительность касания", sen) { v -> sen = v; scope.launch { applyPerGameInt(NubiaSettings.KEY_SENSITIVE, pkg, intArrayOf(v)) } }
-        LevelSlider("Точность следования", follow) { v -> follow = v; scope.launch { applyPerGameInt(NubiaSettings.KEY_FOLLOW, pkg, intArrayOf(v)) } }
-        LevelSlider("Микро-чувствительность", micro) { v -> micro = v; scope.launch { applyPerGameInt(NubiaSettings.KEY_MICRO, pkg, intArrayOf(v)) } }
+        LevelSlider("Чувствительность касания", sen) { v -> sen = v; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_SENSITIVE, pkg, intArrayOf(v)) } }
+        LevelSlider("Точность следования", follow) { v -> follow = v; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_FOLLOW, pkg, intArrayOf(v)) } }
+        LevelSlider("Микро-чувствительность", micro) { v -> micro = v; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_MICRO, pkg, intArrayOf(v)) } }
     }
 }
 
@@ -1033,6 +1101,13 @@ private fun LevelSlider(label: String, level: Int, onLevel: (Int) -> Unit) {
             valueRange = 0f..4f,
             steps = 3,
             onValueChangeFinished = { onLevel(NubiaSettings.TOUCH_SCREEN_LEVEL[idx.roundToInt().coerceIn(0, 4)]) },
+            colors = SliderDefaults.colors(
+                thumbColor = Color(0xFFFF5A4A),
+                activeTrackColor = Color(0xFFC22A30),
+                inactiveTrackColor = Color.White.copy(.16f),
+                activeTickColor = Color(0xFFFF8A7A),
+                inactiveTickColor = Color.White.copy(.24f),
+            ),
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             for (n in NubiaSettings.TOUCH_SCREEN_LEVEL) {
@@ -1049,15 +1124,16 @@ private fun levelToIndex(level: Int): Int {
 
 @Composable
 private fun DisplayTab(pkg: String) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var disp by remember(pkg) { mutableStateOf("default") }
-    LaunchedEffect(pkg) { disp = readPerGameStr(NubiaSettings.KEY_DISPLAY, pkg, "default") }
+    LaunchedEffect(pkg) { disp = readPerGameStr(context, NubiaSettings.KEY_DISPLAY, pkg, "default") }
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Text("Цветовой режим экрана", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Pill("Обычный", disp == "default") { disp = "default"; scope.launch { applyPerGameStr(NubiaSettings.KEY_DISPLAY, pkg, "default") } }
-            Pill("Гонки", disp == "racing") { disp = "racing"; scope.launch { applyPerGameStr(NubiaSettings.KEY_DISPLAY, pkg, "racing") } }
-            Pill("Шутер", disp == "shooting") { disp = "shooting"; scope.launch { applyPerGameStr(NubiaSettings.KEY_DISPLAY, pkg, "shooting") } }
+            Pill("Обычный", disp == "default") { disp = "default"; scope.launch { applyPerGameStr(context, NubiaSettings.KEY_DISPLAY, pkg, "default") } }
+            Pill("Гонки", disp == "racing") { disp = "racing"; scope.launch { applyPerGameStr(context, NubiaSettings.KEY_DISPLAY, pkg, "racing") } }
+            Pill("Шутер", disp == "shooting") { disp = "shooting"; scope.launch { applyPerGameStr(context, NubiaSettings.KEY_DISPLAY, pkg, "shooting") } }
         }
         Text("Профиль усиления цвета под жанр игры.", color = Color.White.copy(.6f), fontSize = 13.sp)
     }
@@ -1065,9 +1141,10 @@ private fun DisplayTab(pkg: String) {
 
 @Composable
 private fun NetworkTab() {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var wifi by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { wifi = readGlobalIntValue(NubiaSettings.KEY_WIFI_LOW_LATENCY, 0) == 1 }
+    LaunchedEffect(Unit) { wifi = readGlobalIntValue(context, NubiaSettings.KEY_WIFI_LOW_LATENCY, 0) == 1 }
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
         Text("Сеть", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -1075,122 +1152,103 @@ private fun NetworkTab() {
                 Text("WiFi: режим низкой задержки", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
                 Text("Глобальный параметр (gsc_wifi_low_latency_mode)", color = Color.White.copy(.55f), fontSize = 12.sp)
             }
-            Switch(checked = wifi, onCheckedChange = { checked -> wifi = checked; scope.launch { applyGlobalValue(NubiaSettings.KEY_WIFI_LOW_LATENCY, if (checked) "1" else "0") } })
+            Switch(
+                checked = wifi,
+                onCheckedChange = { checked -> wifi = checked; scope.launch { applyGlobalValue(context, NubiaSettings.KEY_WIFI_LOW_LATENCY, if (checked) "1" else "0") } },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = Color(0xFFC22A30),
+                    checkedBorderColor = Color(0xFFFF5A4A),
+                ),
+            )
         }
     }
 }
 
 // ---------------------------------------------------------------------------
-// Cooling fan / reactor (rotation only — 13 tapered blades, drawn UNDER the UI)
+// Cooling fan / reactor — restored to the original v16 look (48 ticks),
+// rotation only via a GPU layer (a fan spins, it does not "breathe").
 // ---------------------------------------------------------------------------
 
 private class ReactorView(context: Context) : View(context) {
+
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-    private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-    private val bladePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-    private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-    private var rotationAnimator: ValueAnimator? = null
-    private var angle = 0f
+    private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
+
+    private var rotationAnimator: ObjectAnimator? = null
+
+    init {
+        setLayerType(LAYER_TYPE_HARDWARE, null)
+    }
 
     var animationsEnabled: Boolean = false
         set(value) {
-            if (field != value) {
-                field = value
-                if (value) startAnimators() else stopAnimators()
-            }
+            if (field == value) return
+            field = value
+            if (value) startAnimators() else stopAnimators()
         }
 
-    init { setLayerType(LAYER_TYPE_HARDWARE, null) }
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (animationsEnabled) startAnimators()
+    }
+
+    override fun onDetachedFromWindow() {
+        stopAnimators()
+        super.onDetachedFromWindow()
+    }
 
     private fun startAnimators() {
-        if (rotationAnimator != null) return
-        rotationAnimator = ValueAnimator.ofFloat(0f, 360f).apply {
-            duration = 9000L
-            interpolator = LinearInterpolator()
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.RESTART
-            addUpdateListener { angle = it.animatedValue as Float; invalidate() }
-            start()
+        if (rotationAnimator == null) {
+            rotationAnimator = ObjectAnimator.ofFloat(this, View.ROTATION, 0f, 360f).apply {
+                duration = 9_000L
+                interpolator = LinearInterpolator()
+                repeatCount = ValueAnimator.INFINITE
+                repeatMode = ValueAnimator.RESTART
+            }
         }
+        rotationAnimator?.let { if (!it.isStarted) it.start() }
     }
 
     private fun stopAnimators() {
         rotationAnimator?.cancel()
-        rotationAnimator = null
-    }
-
-    override fun onDetachedFromWindow() {
-        super.onDetachedFromWindow()
-        stopAnimators()
+        rotation = 0f
     }
 
     override fun onDraw(canvas: android.graphics.Canvas) {
         super.onDraw(canvas)
         val cx = width / 2f
         val cy = height / 2f
-        val radius = minOf(cx, cy)
-        if (radius <= 0f) return
+        val r = kotlin.math.min(width, height) / 2f
 
-        fillPaint.shader = android.graphics.RadialGradient(
-            cx, cy, radius,
-            intArrayOf(0xFF20262E.toInt(), 0xFF12161B.toInt(), 0xFF090B0E.toInt()),
-            floatArrayOf(0f, 0.7f, 1f),
-            android.graphics.Shader.TileMode.CLAMP,
-        )
-        canvas.drawCircle(cx, cy, radius * 0.94f, fillPaint)
-        fillPaint.shader = null
+        fillPaint.color = android.graphics.Color.argb(168, 10, 13, 17)
+        canvas.drawCircle(cx, cy, r, fillPaint)
 
-        strokePaint.color = 0xFF2A333D.toInt()
-        strokePaint.strokeWidth = radius * 0.035f
-        canvas.drawCircle(cx, cy, radius * 0.9f, strokePaint)
-        strokePaint.color = 0x33FF5A4A
-        strokePaint.strokeWidth = radius * 0.012f
-        canvas.drawCircle(cx, cy, radius * 0.82f, strokePaint)
+        fillPaint.color = android.graphics.Color.argb(46, 255, 32, 61)
+        canvas.drawCircle(cx, cy, r * .84f, fillPaint)
 
-        val bladeCount = 13
-        val hubR = radius * 0.2f
-        val tipR = radius * 0.8f
-        val step = 360f / bladeCount
-        val baseHalf = radius * 0.085f
-        val tipHalf = radius * 0.022f
-        canvas.save()
-        canvas.rotate(angle, cx, cy)
-        for (i in 0 until bladeCount) {
-            canvas.save()
-            canvas.rotate(step * i, cx, cy)
-            val path = android.graphics.Path()
-            path.moveTo(cx - baseHalf, cy - hubR)
-            path.quadTo(cx - tipHalf * 2.2f, cy - (hubR + tipR) * 0.5f, cx - tipHalf, cy - tipR)
-            path.lineTo(cx + tipHalf, cy - tipR)
-            path.quadTo(cx + baseHalf * 1.4f, cy - (hubR + tipR) * 0.5f, cx + baseHalf, cy - hubR)
-            path.close()
+        strokePaint.color = android.graphics.Color.argb(36, 255, 75, 82)
+        strokePaint.strokeWidth = 18f
+        canvas.drawCircle(cx, cy, r * .58f, strokePaint)
 
-            bladePaint.shader = android.graphics.LinearGradient(
-                cx, cy - hubR, cx, cy - tipR,
-                intArrayOf(0xFF3A444F.toInt(), 0xFF222A32.toInt(), 0xFF161B21.toInt()),
-                floatArrayOf(0f, 0.55f, 1f),
-                android.graphics.Shader.TileMode.CLAMP,
-            )
-            canvas.drawPath(path, bladePaint)
-
-            edgePaint.color = 0x80FF5A4A.toInt()
-            edgePaint.strokeWidth = radius * 0.01f
-            canvas.drawLine(cx + tipHalf, cy - tipR, cx + baseHalf, cy - hubR, edgePaint)
-            canvas.restore()
+        for (i in 0 until 48) {
+            val angle = Math.toRadians(i * 360.0 / 48.0)
+            val inner = r * .89f
+            val outer = if (i % 4 == 0) r * .985f else r * .94f
+            strokePaint.color = if (i % 4 == 0) {
+                android.graphics.Color.argb(36, 255, 255, 255)
+            } else {
+                android.graphics.Color.argb(14, 255, 255, 255)
+            }
+            strokePaint.strokeWidth = if (i % 4 == 0) 3f else 1.2f
+            val sx = cx + kotlin.math.cos(angle).toFloat() * inner
+            val sy = cy + kotlin.math.sin(angle).toFloat() * inner
+            val ex = cx + kotlin.math.cos(angle).toFloat() * outer
+            val ey = cy + kotlin.math.sin(angle).toFloat() * outer
+            canvas.drawLine(sx, sy, ex, ey, strokePaint)
         }
-        bladePaint.shader = null
-        canvas.restore()
-
-        fillPaint.shader = android.graphics.RadialGradient(
-            cx, cy, hubR * 1.2f,
-            intArrayOf(0xFF49555F.toInt(), 0xFF1A2027.toInt()),
-            null,
-            android.graphics.Shader.TileMode.CLAMP,
-        )
-        canvas.drawCircle(cx, cy, hubR * 1.2f, fillPaint)
-        fillPaint.shader = null
-        strokePaint.color = 0xFF3A4650.toInt()
-        strokePaint.strokeWidth = radius * 0.02f
-        canvas.drawCircle(cx, cy, hubR * 1.2f, strokePaint)
     }
 }

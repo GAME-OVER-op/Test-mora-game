@@ -4,9 +4,8 @@ import java.io.BufferedReader
 import java.io.FileReader
 
 /**
- * Reads the same kernel frequency nodes GameSpace uses for the CPU / GPU rings.
- * Tries a direct file read first, falls back to `su -c cat` when denied.
- * Ported from the test-mora reference (FreqReader.java).
+ * Reads the kernel frequency nodes for the CPU / GPU rings via a plain file read.
+ * No root: SELinux grants our privileged app read access to these sysfs paths.
  */
 object FreqReader {
 
@@ -18,19 +17,14 @@ object FreqReader {
     const val GPU_MAX_MTK = "/sys/devices/platform/soc/soc:mm/23100000.gpu/devfreq/23100000.gpu/max_freq"
 
     fun read(path: String): Long {
-        try {
+        return try {
             BufferedReader(FileReader(path)).use { r ->
                 val line = r.readLine()?.trim()
-                if (!line.isNullOrEmpty()) return extractFirstNumber(line)
+                if (line.isNullOrEmpty()) -1L else extractFirstNumber(line)
             }
-        } catch (ignored: Exception) {
+        } catch (e: Exception) {
+            -1L
         }
-        try {
-            val out = RootShell.runOne("cat " + path).trim()
-            if (out.isNotEmpty() && !out.startsWith("ERROR")) return extractFirstNumber(out)
-        } catch (ignored: Exception) {
-        }
-        return -1L
     }
 
     private fun extractFirstNumber(s: String): Long {
@@ -44,5 +38,5 @@ object FreqReader {
     fun cpuCur(): Long = read(CPU_CUR)
     fun cpuMax(): Long { val m = read(CPU_MAX); return if (m > 0) m else 3187200L }
     fun gpuCur(): Long { val v = read(GPU_CUR); return if (v > 0) v else read(GPU_CUR_MTK) }
-    fun gpuMax(): Long { var v = read(GPU_MAX); if (v <= 0) v = read(GPU_MAX_MTK); return if (v > 0) v else 1000000000L }
+    fun gpuMax(): Long { var v = read(GPU_MAX); if (v <= 0) v = read(GPU_MAX_MTK); return if (v > 0) v else 1_000_000_000L }
 }
