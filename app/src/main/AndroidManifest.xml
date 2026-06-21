@@ -36,14 +36,12 @@
             android:screenOrientation="landscape"
             android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
             android:theme="@style/Theme.GameSpace">
-            <!-- No LAUNCHER category on purpose: the app has NO launcher icon
-                 (RedMagic GameSpace style). It is started explicitly by the
-                 perf_daemon (am start with an explicit component) when the side
-                 slider is flipped ON, and force-stopped when flipped OFF.
-                 exported=true keeps explicit component start working. -->
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-            </intent-filter>
+            <!-- NO launcher icon: MainActivity has NO MAIN/LAUNCHER intent
+                 filter at all, so it never appears in any launcher, including
+                 OEM launchers that surface MAIN-only activities (RedMagic
+                 GameSpace style). It is started only by explicit component from
+                 the perf_daemon (am start -n com.mora.gamespace/.MainActivity);
+                 android:exported="true" keeps that explicit start working. -->
         </activity>
     <service
             android:name=".TriggerOverlayService"
