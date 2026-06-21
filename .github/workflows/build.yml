@@ -60,7 +60,22 @@ jobs:
           echo "GAMESPACE_RELEASE_KEYSTORE=$RUNNER_TEMP/gamespace-release.keystore" >> "$GITHUB_ENV"
 
       - name: Build GameSpace APK
-        run: gradle :app:assembleRelease --stacktrace
+        run: gradle clean :app:assembleRelease --stacktrace --no-build-cache
+
+      - name: Verify APK has NO launcher activity
+        run: |
+          set -e
+          APK=app/build/outputs/apk/release/app-release.apk
+          AAPT2=$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort -r | head -n1)
+          echo "Using aapt2: $AAPT2"
+          BADGING=$("$AAPT2" dump badging "$APK")
+          if echo "$BADGING" | grep -q 'launchable-activity'; then
+            echo "ERROR: APK declares a launcher activity - the app icon would appear in the launcher."
+            echo "$BADGING" | grep 'launchable-activity'
+            echo "This means the build used a stale manifest. Fix: ensure the manifest has no MAIN/LAUNCHER intent-filter and rebuild clean."
+            exit 1
+          fi
+          echo "OK: no launchable-activity in the built APK - launcher icon will not appear."
 
       - name: Package Magisk module
         run: |
