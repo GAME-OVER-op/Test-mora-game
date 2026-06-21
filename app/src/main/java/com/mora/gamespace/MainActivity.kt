@@ -57,6 +57,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -398,6 +401,7 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEn
     var showAddGames by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showTriggers by remember { mutableStateOf(false) }
+    var showGlobal by remember { mutableStateOf(false) }
     var triggersOn by remember { mutableStateOf(false) }
 
     suspend fun rebuildGames() {
@@ -456,7 +460,7 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEn
 
         // Cooling fan sits BEHIND the cards/HUD (drawn first = lowest layer).
         CoreReactor(Modifier.align(Alignment.Center).size(420.dp), animationsEnabled = animationsEnabled, fanLevel = fanLevel)
-        TopHud(Modifier.align(Alignment.TopCenter))
+        TopHud(Modifier.align(Alignment.TopCenter), onOpenSettings = { showGlobal = true })
         LeftGameRail(
             games = games,
             selectedIndex = selectedIndex,
@@ -529,10 +533,13 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEn
     if (showSettings && settingsGame != null) {
         GameSettingsSheet(game = settingsGame, onClose = { showSettings = false })
     }
+    if (showGlobal) {
+        GlobalSettingsSheet(onClose = { showGlobal = false })
+    }
 }
 
 @Composable
-private fun TopHud(modifier: Modifier = Modifier) {
+private fun TopHud(modifier: Modifier = Modifier, onOpenSettings: () -> Unit) {
     val hud by rememberHudState()
     Row(
         modifier = modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
@@ -547,7 +554,16 @@ private fun TopHud(modifier: Modifier = Modifier) {
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             TopIconButton(R.drawable.add_shortcut_icon)
-            TopIconButton(R.drawable.chat_assistant_settings)
+            Box(
+                Modifier.size(42.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.Black.copy(.35f))
+                    .border(1.dp, Color.White.copy(.18f), RoundedCornerShape(8.dp))
+                    .clickable(onClick = onOpenSettings),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Color.White.copy(alpha = .85f), modifier = Modifier.size(26.dp))
+            }
         }
     }
 }
