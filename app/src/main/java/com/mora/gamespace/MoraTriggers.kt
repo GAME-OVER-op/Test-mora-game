@@ -1,5 +1,7 @@
 package com.mora.gamespace
 
+import android.content.Context
+
 /**
  * Hardware shoulder-trigger mapping for a game, persisted as a system property that the
  * mora-perf daemon polls:
@@ -74,10 +76,26 @@ object MoraTriggers {
         return Triggers(parseSide(sides.getOrNull(0)), parseSide(sides.getOrNull(1)))
     }
 
-    fun read(pkg: String): Triggers = decode(getProp(propName(pkg)))
+    private const val PREFS = "mora_triggers"
 
-    /** @return true if the underlying set call did not throw (SELinux may still reject it). */
-    fun write(pkg: String, t: Triggers): Boolean = setProp(propName(pkg), encode(t))
+    /**
+     * The app UI's source of truth is SharedPreferences, which is always writable. We also mirror
+     * the value into the persist.mora.g.<pkg> system property the daemon reads (best-effort): that
+     * set only succeeds once the privileged SELinux policy is installed, but the app still
+     * remembers the mapping in the meantime so coordinates are never lost.
+     */
+    fun read(context: Context, pkg: String): Triggers {
+        val stored = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(pkg, null)
+        if (stored != null) return decode(stored)
+        return decode(getProp(propName(pkg)))
+    }
+
+    /** @return true if the system-property mirror succeeded (SELinux may still reject it). */
+    fun write(context: Context, pkg: String, t: Triggers): Boolean {
+        val encoded = encode(t)
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(pkg, encoded).apply()
+        return setProp(propName(pkg), encoded)
+    }
 
     // --- android.os.SystemProperties via reflection -------------------------------------
 

@@ -417,7 +417,7 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEn
 
     LaunchedEffect(selected?.packageName, showTriggers) {
         val pkg = selected?.packageName
-        triggersOn = if (pkg != null) withContext(Dispatchers.IO) { MoraTriggers.read(pkg).anyEnabled } else false
+        triggersOn = if (pkg != null) withContext(Dispatchers.IO) { MoraTriggers.read(context, pkg).anyEnabled } else false
     }
     LaunchedEffect(TriggerBridge.requestPkg) {
         val pkg = TriggerBridge.requestPkg ?: return@LaunchedEffect
@@ -1408,6 +1408,7 @@ private fun TriggerSettingsSheet(
     onCalibrate: (Boolean, Boolean) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var leftOn by remember(game.packageName) { mutableStateOf(false) }
     var rightOn by remember(game.packageName) { mutableStateOf(false) }
     var saved by remember(game.packageName) { mutableStateOf(MoraTriggers.Triggers.NONE) }
@@ -1415,7 +1416,7 @@ private fun TriggerSettingsSheet(
 
     LaunchedEffect(Unit) { visible = true }
     LaunchedEffect(game.packageName) {
-        val t = withContext(Dispatchers.IO) { MoraTriggers.read(game.packageName) }
+        val t = withContext(Dispatchers.IO) { MoraTriggers.read(context, game.packageName) }
         saved = t
         leftOn = t.left.enabled
         rightOn = t.right.enabled
@@ -1518,7 +1519,7 @@ private fun TriggerSettingsSheet(
                             )
                             scope.launch {
                                 withContext(Dispatchers.IO) {
-                                    MoraTriggers.write(game.packageName, newTriggers)
+                                    MoraTriggers.write(context, game.packageName, newTriggers)
                                 }
                             }
                             onClose()

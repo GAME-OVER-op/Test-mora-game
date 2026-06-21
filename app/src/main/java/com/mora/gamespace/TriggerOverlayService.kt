@@ -15,7 +15,9 @@ import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
@@ -35,6 +37,8 @@ class TriggerOverlayService : Service() {
 
     private var windowManager: WindowManager? = null
     private var overlay: OverlayView? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private var addRunnable: Runnable? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -65,10 +69,10 @@ class TriggerOverlayService : Service() {
         val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         windowManager = wm
 
-        val saved = MoraTriggers.read(pkg)
+        val saved = MoraTriggers.read(this, pkg)
         val view = OverlayView(this, leftEnabled, rightEnabled, saved)
         view.onSave = { triggers ->
-            MoraTriggers.write(pkg, triggers)
+            MoraTriggers.write(applicationContext, pkg, triggers)
             reopenTriggers(pkg)
             stopSelf()
         }
@@ -84,18 +88,25 @@ class TriggerOverlayService : Service() {
             WindowManager.LayoutParams.MATCH_PARENT,
             type,
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT,
         )
         lp.gravity = Gravity.TOP or Gravity.START
         lp.x = 0
         lp.y = 0
 
-        try {
-            wm.addView(view, lp)
-        } catch (e: Throwable) {
-            stopSelf()
+        // Let the game finish coming to the foreground before we place the overlay, so the
+        // launch transition isn't covered by the calibration window.
+        val r = Runnable {
+            try {
+                wm.addView(view, lp)
+            } catch (e: Throwable) {
+                stopSelf()
+            }
         }
+        addRunnable = r
+        handler.postDelayed(r, 900L)
         return START_NOT_STICKY
     }
 
@@ -116,6 +127,8 @@ class TriggerOverlayService : Service() {
     }
 
     private fun removeOverlay() {
+        addRunnable?.let { handler.removeCallbacks(it) }
+        addRunnable = null
         val v = overlay
         overlay = null
         if (v != null) {
@@ -186,7 +199,6 @@ private class OverlayView(
     private val markerSize = dp(64f)
     private val closeSize = dp(54f)
 
-    private val dimPaint = Paint().apply { color = Color.argb(110, 0, 0, 0) }
     private val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val leftRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -235,10 +247,6 @@ private class OverlayView(
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        val w = width.toFloat()
-        val h = height.toFloat()
-        canvas.drawRect(0f, 0f, w, h, dimPaint)
-
         drawPointers(canvas)
 
         if (leftEnabled) drawMarker(canvas, lx, ly, leftRing, "Л")
