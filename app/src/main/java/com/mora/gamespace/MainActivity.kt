@@ -87,6 +87,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -863,25 +864,21 @@ private fun AppRow(app: InstalledApp, isAdded: Boolean, onAdd: () -> Unit, onRem
 }
 
 @Composable
-private fun Pill(text: String, active: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    val border by animateColorAsState(if (active) Color(0xFFFF6A4A) else Color.White.copy(.16f), tween(200), label = "pillBorder")
-    val scale by animateFloatAsState(if (active) 1f else 0.97f, tween(180), label = "pillScale")
-    val bg = if (active) {
-        Brush.horizontalGradient(listOf(Color(0xFF8C1820), Color(0xFFC22A30)))
-    } else {
-        Brush.horizontalGradient(listOf(Color(0xFF181B21), Color(0xFF101318)))
-    }
+private fun Pill(text: String, active: Boolean, modifier: Modifier = Modifier, accent: Color = Color(0xFFFF6A4A), onClick: () -> Unit) {
+    val border by animateColorAsState(if (active) accent else Color.White.copy(.12f), tween(220), label = "pillBorder")
+    val scale by animateFloatAsState(if (active) 1f else 0.98f, tween(180), label = "pillScale")
+    val bg by animateColorAsState(if (active) Color(0xFF1E2230) else Color(0xFF14171E), tween(220), label = "pillBg")
     Box(
         modifier
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(RoundedCornerShape(11.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(bg)
-            .border(1.dp, border, RoundedCornerShape(11.dp))
+            .border(if (active) 1.5.dp else 1.dp, border, RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 9.dp),
+            .padding(horizontal = 18.dp, vertical = 11.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = if (active) Color.White else Color.White.copy(.74f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(text, color = if (active) Color.White else Color.White.copy(.62f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -914,15 +911,15 @@ private fun GameSettingsSheet(game: GameCard, onClose: () -> Unit) {
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.86f)
                 .graphicsLayer { translationY = (1f - p) * size.height }
                 .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
-                .background(Brush.verticalGradient(listOf(Color(0xFF170A0C), Color(0xFF0C0E12)), endY = 380f))
-                .border(1.dp, Color(0xFFFF5A4A).copy(.20f), RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
+                .background(Brush.verticalGradient(listOf(Color(0xFF181B22), Color(0xFF0E1014)), endY = 420f))
+                .border(1.dp, Color.White.copy(.06f), RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
         ) {
             Column(Modifier.fillMaxSize()) {
                 Box(Modifier.fillMaxWidth().height(26.dp), contentAlignment = Alignment.Center) {
                     Box(
-                        Modifier.width(46.dp).height(4.dp).clip(CircleShape)
-                            .background(Brush.horizontalGradient(listOf(Color(0xFFFF5A4A), Color(0xFFB11E26))))
+                        Modifier.width(44.dp).height(4.dp).clip(CircleShape)
+                            .background(Color.White.copy(.22f))
                     )
                 }
                 Row(Modifier.fillMaxWidth().weight(1f)) {
@@ -956,7 +953,7 @@ private fun GameSettingsSheet(game: GameCard, onClose: () -> Unit) {
 
 @Composable
 private fun CategoryItem(title: String, selected: Boolean, onClick: () -> Unit) {
-    val bg by animateColorAsState(if (selected) Color(0xFF24181A) else Color.Transparent, tween(220), label = "catBg")
+    val bg by animateColorAsState(if (selected) Color(0xFF1E2230) else Color.Transparent, tween(220), label = "catBg")
     val barH by animateFloatAsState(if (selected) 18f else 0f, tween(220), label = "catBar")
     val textColor by animateColorAsState(if (selected) Color.White else Color.White.copy(.62f), tween(220), label = "catTxt")
     Box(
@@ -995,12 +992,13 @@ private fun PerformanceTab(pkg: String) {
     Column(verticalArrangement = Arrangement.spacedBy(22.dp)) {
         Text("Режим производительности", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Pill("Баланс", mode == NubiaSettings.MODE_BALANCE) { mode = NubiaSettings.MODE_BALANCE; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_PERF_MODE, pkg, intArrayOf(NubiaSettings.MODE_BALANCE)) } }
-            Pill("Подъём", mode == NubiaSettings.MODE_BOOST) { mode = NubiaSettings.MODE_BOOST; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_PERF_MODE, pkg, intArrayOf(NubiaSettings.MODE_BOOST)) } }
-            Pill("За пределами", mode == NubiaSettings.MODE_BEYOND) { mode = NubiaSettings.MODE_BEYOND; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_PERF_MODE, pkg, intArrayOf(NubiaSettings.MODE_BEYOND)) } }
+            Pill("Баланс", mode == NubiaSettings.MODE_BALANCE, accent = ringAccent(NubiaSettings.MODE_BALANCE)) { mode = NubiaSettings.MODE_BALANCE; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_PERF_MODE, pkg, intArrayOf(NubiaSettings.MODE_BALANCE)) } }
+            Pill("Подъём", mode == NubiaSettings.MODE_BOOST, accent = ringAccent(NubiaSettings.MODE_BOOST)) { mode = NubiaSettings.MODE_BOOST; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_PERF_MODE, pkg, intArrayOf(NubiaSettings.MODE_BOOST)) } }
+            Pill("За пределами", mode == NubiaSettings.MODE_BEYOND, accent = ringAccent(NubiaSettings.MODE_BEYOND)) { mode = NubiaSettings.MODE_BEYOND; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_PERF_MODE, pkg, intArrayOf(NubiaSettings.MODE_BEYOND)) } }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(46.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
             PerfRing(mode, true, fmtGhz(cpuAnim), "ГГц", "CPU")
+            RedmagicMark(ringAccent(mode))
             PerfRing(mode, false, fmtMhz(gpuAnim), "МГц", "GPU")
         }
         Text("Повышение частоты ЦП/ГП для требовательных игр. «За пределами» — максимум.", color = Color.White.copy(.6f), fontSize = 13.sp)
@@ -1012,38 +1010,62 @@ private fun PerfRing(mode: Int, cpu: Boolean, valueText: String, unit: String, l
     val accent = ringAccent(mode)
     val infinite = rememberInfiniteTransition(label = "perfBob")
     val bob by infinite.animateFloat(
-        initialValue = -5f,
-        targetValue = 5f,
-        animationSpec = infiniteRepeatable(animation = tween(1700, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
+        initialValue = -2.5f,
+        targetValue = 2.5f,
+        animationSpec = infiniteRepeatable(animation = tween(2200, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
         label = "perfBobY",
     )
-    Box(Modifier.size(width = 168.dp, height = 210.dp), contentAlignment = Alignment.BottomCenter) {
+    Box(Modifier.size(width = 156.dp, height = 178.dp), contentAlignment = Alignment.BottomCenter) {
+        // светящийся диск прижат к низу (оставляет место под подпись)
         Image(
             painterResource(ringRes(mode, cpu)),
             contentDescription = null,
-            modifier = Modifier.size(150.dp),
+            modifier = Modifier.size(132.dp).align(Alignment.BottomCenter).padding(bottom = 20.dp),
             contentScale = ContentScale.Fit,
         )
+        // подпись CPU / GPU под диском
         Text(
             label,
-            color = Color.White.copy(.8f),
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 66.dp),
+            color = accent,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.5.sp,
+            modifier = Modifier.align(Alignment.BottomCenter),
         )
+        // значение частоты парит чуть выше диска (опущено ниже, чем раньше)
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.align(Alignment.TopCenter).graphicsLayer { translationY = bob.dp.toPx() },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 6.dp)
+                .graphicsLayer { translationY = bob.dp.toPx() },
         ) {
             Text(
                 valueText,
                 color = Color.White,
-                fontSize = 36.sp,
+                fontSize = 30.sp,
                 fontWeight = FontWeight.ExtraBold,
-                style = TextStyle(shadow = Shadow(color = accent.copy(alpha = .95f), blurRadius = 30f)),
+                style = TextStyle(shadow = Shadow(color = accent.copy(alpha = .85f), blurRadius = 22f)),
             )
-            Text(unit, color = accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text(unit, color = Color.White.copy(.7f), fontSize = 12.sp, fontWeight = FontWeight.Medium)
         }
+    }
+}
+
+@Composable
+private fun RedmagicMark(accent: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = 18.dp)) {
+        Box(
+            Modifier.width(34.dp).height(1.dp)
+                .background(Brush.horizontalGradient(listOf(Color.Transparent, accent.copy(.7f), Color.Transparent)))
+        )
+        Spacer(Modifier.height(8.dp))
+        Text("REDMAGIC", color = Color.White.copy(.85f), fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
+        Spacer(Modifier.height(8.dp))
+        Box(
+            Modifier.width(34.dp).height(1.dp)
+                .background(Brush.horizontalGradient(listOf(Color.Transparent, accent.copy(.7f), Color.Transparent)))
+        )
     }
 }
 
@@ -1078,23 +1100,23 @@ private fun TouchTab(pkg: String) {
         micro = readPerGameInt(context, NubiaSettings.KEY_MICRO, pkg, 0)
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        Text("Частота дискретизации касания", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+    Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        Text("Частота дискретизации при касании", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Pill("Высокая · 480 Гц", sample == 480) { sample = 480; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_SAMPLE_RATE, pkg, intArrayOf(480)) } }
             Pill("Сверхвысокая · 960 Гц", sample == 960) { sample = 960; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_SAMPLE_RATE, pkg, intArrayOf(960)) } }
         }
-        LevelSlider("Чувствительность касания", sen) { v -> sen = v; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_SENSITIVE, pkg, intArrayOf(v)) } }
-        LevelSlider("Точность следования", follow) { v -> follow = v; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_FOLLOW, pkg, intArrayOf(v)) } }
-        LevelSlider("Микро-чувствительность", micro) { v -> micro = v; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_MICRO, pkg, intArrayOf(v)) } }
+        LevelSlider("Чувствительность", "Уменьшение ложных касаний", "Увеличение скорости", sen) { v -> sen = v; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_SENSITIVE, pkg, intArrayOf(v)) } }
+        LevelSlider("Плавность", "Плавнее", "Отзывчивее", follow) { v -> follow = v; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_FOLLOW, pkg, intArrayOf(v)) } }
+        LevelSlider("Стабилизация", "Простая идентификация небольших проскальзываний", "Уменьшает дрожание экрана", micro) { v -> micro = v; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_MICRO, pkg, intArrayOf(v)) } }
     }
 }
 
 @Composable
-private fun LevelSlider(label: String, level: Int, onLevel: (Int) -> Unit) {
+private fun LevelSlider(label: String, lowLabel: String, highLabel: String, level: Int, onLevel: (Int) -> Unit) {
     var idx by remember(level) { mutableStateOf(levelToIndex(level).toFloat()) }
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, color = Color.White.copy(.82f), fontSize = 14.sp)
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         Slider(
             value = idx,
             onValueChange = { idx = it },
@@ -1110,9 +1132,8 @@ private fun LevelSlider(label: String, level: Int, onLevel: (Int) -> Unit) {
             ),
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            for (n in NubiaSettings.TOUCH_SCREEN_LEVEL) {
-                Text(n.toString(), color = Color.White.copy(.5f), fontSize = 11.sp)
-            }
+            Text(lowLabel, color = Color.White.copy(.5f), fontSize = 11.sp, modifier = Modifier.weight(1f))
+            Text(highLabel, color = Color.White.copy(.5f), fontSize = 11.sp, textAlign = TextAlign.End, modifier = Modifier.weight(1f))
         }
     }
 }
