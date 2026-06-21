@@ -24,9 +24,6 @@ import android.view.WindowInsetsController
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.Lifecycle
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -200,7 +197,6 @@ private class VlcMusicController {
 @Composable
 private fun BackgroundMusic(enabled: Boolean) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
     val controller = remember { VlcMusicController() }
 
     // Background music plays through the VLC engine (libVLC) with its own FFmpeg-based decoders,
@@ -243,41 +239,18 @@ private fun BackgroundMusic(enabled: Boolean) {
         }
     }
 
-    var inForeground by remember { mutableStateOf(true) }
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_START -> inForeground = true
-                Lifecycle.Event.ON_STOP -> inForeground = false
-                else -> {}
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    // Smoothly fade in on foreground, fade out + pause when the app is hidden to background.
-    LaunchedEffect(enabled, inForeground) {
+    // Smoothly fade in after the libVLC player is created. The player is still
+    // released by DisposableEffect when this composable leaves composition.
+    LaunchedEffect(enabled) {
         val mp = controller.player ?: return@LaunchedEffect
-        if (inForeground) {
-            runCatching { if (!mp.isPlaying) mp.play() }
-            var v = 0
-            while (v < 100) {
-                runCatching { mp.volume = v }
-                delay(26)
-                v += 10
-            }
-            runCatching { mp.volume = 100 }
-        } else {
-            var v = 100
-            while (v > 0) {
-                runCatching { mp.volume = v }
-                delay(40)
-                v -= 8
-            }
-            runCatching { mp.volume = 0 }
-            runCatching { mp.pause() }
+        runCatching { if (!mp.isPlaying) mp.play() }
+        var v = 0
+        while (v < 100) {
+            runCatching { mp.volume = v }
+            delay(26)
+            v += 10
         }
+        runCatching { mp.volume = 100 }
     }
 }
 
