@@ -95,6 +95,20 @@ class TriggerOverlayService : Service() {
         lp.gravity = Gravity.TOP or Gravity.START
         lp.x = 0
         lp.y = 0
+        // Span the ENTIRE physical display, including the camera-cutout strip.
+        // Otherwise the overlay is inset (e.g. width 2387 instead of 2480 on a
+        // 93px cutout), so the captured w/h and the marker origin no longer match
+        // the real display and the daemon maps the coordinate to the wrong spot.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            lp.layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            @Suppress("DEPRECATION")
+            run {
+                lp.layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
 
         // Let the game finish coming to the foreground before we place the overlay, so the
         // launch transition isn't covered by the calibration window.

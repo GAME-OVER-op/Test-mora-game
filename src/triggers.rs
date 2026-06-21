@@ -628,11 +628,19 @@ fn map_side(side: &SideConfig, fb_w: i32, fb_h: i32, ranges: &Ranges) -> (i32, i
     let v = (side.y_px as f64 / (dh - 1.0).max(1.0)).clamp(0.0, 1.0);
 
     // Display-normalised (u,v) -> panel-normalised (a,b); a along short edge (X).
+    //
+    // Derived from the inverse of Android's panel->logical touch transform
+    // (verified against the camera-cutout position: portrait-top cutout appears
+    // on the LEFT in ROTATION_90, which pins the handedness):
+    //   rot0 (natural)  : a=u,     b=v
+    //   rot1 (90  CCW)  : a=1-v,   b=u
+    //   rot2 (180)      : a=1-u,   b=1-v
+    //   rot3 (270)      : a=v,     b=1-u
     let (a, b) = match ((side.rot % 4) + 4) % 4 {
         0 => (u, v),
-        1 => (v, 1.0 - u),
+        1 => (1.0 - v, u),
         2 => (1.0 - u, 1.0 - v),
-        _ => (1.0 - v, u),
+        _ => (v, 1.0 - u),
     };
 
     let xrng = (ranges.x_max - ranges.x_min).max(1) as f64;

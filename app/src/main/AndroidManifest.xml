@@ -36,9 +36,14 @@
             android:screenOrientation="landscape"
             android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
             android:theme="@style/Theme.GameSpace">
+            <!-- No LAUNCHER category on purpose: the app has NO launcher icon
+                 (RedMagic GameSpace style). It is started explicitly by the
+                 perf_daemon when the side slider is flipped ON:
+                   am start --user 0 -n com.mora.gamespace/.MainActivity
+                 and force-stopped when flipped OFF. exported=true keeps the
+                 explicit component start working without a launcher entry. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
     <service

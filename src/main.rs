@@ -19,6 +19,7 @@ mod power;
 mod profiles;
 mod screen;
 mod services;
+mod slider;
 mod split_charge;
 mod swap;
 mod state;
@@ -226,6 +227,8 @@ fn main() {
     games_watch::spawn(shared.clone());
     led_watch::spawn(shared.clone());
     notifications::spawn(shared.clone(), leds.clone());
+    // Physical side slider -> launch/close GameSpace (RedMagic-style, no icon).
+    slider::spawn();
 
     // Apply initial LED state (Normal profile, screen assumed ON).
     {
