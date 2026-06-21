@@ -13,6 +13,7 @@ import android.net.Uri
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer as VlcMediaPlayer
+import android.graphics.BitmapFactory
 import java.io.File
 import java.io.FileOutputStream
 import android.os.BatteryManager
@@ -81,6 +82,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -395,6 +397,8 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEn
     var fanEnabled by remember { mutableStateOf(true) }
     var showAddGames by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    var showTriggers by remember { mutableStateOf(false) }
+    var triggersOn by remember { mutableStateOf(false) }
 
     suspend fun rebuildGames() {
         val apps = withContext(Dispatchers.IO) { InstalledApps.loadUserApps(context) }
@@ -410,6 +414,18 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEn
     LaunchedEffect(Unit) { rebuildGames() }
 
     val selected = games.getOrNull(selectedIndex)
+
+    LaunchedEffect(selected?.packageName, showTriggers) {
+        val pkg = selected?.packageName
+        triggersOn = if (pkg != null) withContext(Dispatchers.IO) { MoraTriggers.read(pkg).anyEnabled } else false
+    }
+    LaunchedEffect(TriggerBridge.requestPkg) {
+        val pkg = TriggerBridge.requestPkg ?: return@LaunchedEffect
+        val idx = games.indexOfFirst { it.packageName == pkg }
+        if (idx >= 0) selectedIndex = idx
+        showTriggers = true
+        TriggerBridge.consume()
+    }
 
     Box(Modifier.fillMaxSize().background(Color(0xFF050506))) {
         Image(
@@ -459,6 +475,8 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEn
             bgmEnabled = bgmEnabled,
             onFanToggle = { fanEnabled = !fanEnabled },
             onBgmToggle = onBgmToggle,
+            triggersOn = triggersOn,
+            onJoystick = { if (selected != null) showTriggers = true },
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp),
         )
     }
@@ -483,6 +501,17 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEn
         )
     }
 
+    val triggerGame = selected
+    if (showTriggers && triggerGame != null) {
+        TriggerSettingsSheet(
+            game = triggerGame,
+            onClose = { showTriggers = false },
+            onCalibrate = { left, right ->
+                showTriggers = false
+                startTriggerCalibration(context, triggerGame.packageName, left, right)
+            },
+        )
+    }
     val settingsGame = selected
     if (showSettings && settingsGame != null) {
         GameSettingsSheet(game = settingsGame, onClose = { showSettings = false })
@@ -501,15 +530,46 @@ private fun TopHud(modifier: Modifier = Modifier) {
             Text("REDMAGIC", color = Color.White.copy(alpha = .9f), fontSize = 28.sp, letterSpacing = 7.sp, fontWeight = FontWeight.Light)
             Text(hud.time, color = Color.White.copy(alpha = .75f), fontSize = 16.sp, fontWeight = FontWeight.Bold)
             BatteryMini(hud.batteryPercent)
-            Box(
-                Modifier.size(34.dp).clip(CircleShape).background(Brush.radialGradient(listOf(Color(0xFFFF6F86), Color(0xFF3A0B14))))
-                    .border(1.dp, Color.White.copy(.3f), CircleShape),
-                contentAlignment = Alignment.Center,
-            ) { Text("M", color = Color.White, fontWeight = FontWeight.Bold) }
+            UserAvatar()
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             TopIconButton(R.drawable.add_shortcut_icon)
             TopIconButton(R.drawable.chat_assistant_settings)
+        }
+    }
+}
+
+@Composable
+private fun UserAvatar() {
+    // Use the current device user's avatar (/data/system/users/0/photo.png) when it is
+    // readable; otherwise fall back to the RedMagic logo. Reading that system path requires
+    // the privileged/SELinux setup in scripts/grant_gamespace_permissions.sh.
+    val avatar = remember {
+        runCatching {
+            val f = File("/data/system/users/0/photo.png")
+            if (f.exists() && f.canRead()) BitmapFactory.decodeFile(f.absolutePath)?.asImageBitmap() else null
+        }.getOrNull()
+    }
+    Box(
+        Modifier.size(34.dp).clip(CircleShape)
+            .background(Brush.radialGradient(listOf(Color(0xFFFF6F86), Color(0xFF3A0B14))))
+            .border(1.dp, Color.White.copy(.3f), CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (avatar != null) {
+            Image(
+                bitmap = avatar,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize().clip(CircleShape),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Image(
+                painter = painterResource(R.drawable.rm_logo),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize().padding(5.dp),
+                contentScale = ContentScale.Fit,
+            )
         }
     }
 }
@@ -685,9 +745,9 @@ private fun RedLaunchButton(text: String, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
-            Image(painterResource(R.drawable.exo_ic_chevron_right), contentDescription = null, modifier = Modifier.size(30.dp), contentScale = ContentScale.Fit)
+            Image(painterResource(R.drawable.game_start_left), contentDescription = null, modifier = Modifier.size(30.dp), contentScale = ContentScale.Fit)
             Text(text, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Image(painterResource(R.drawable.exo_ic_chevron_left), contentDescription = null, modifier = Modifier.size(30.dp), contentScale = ContentScale.Fit)
+            Image(painterResource(R.drawable.game_start_right), contentDescription = null, modifier = Modifier.size(30.dp), contentScale = ContentScale.Fit)
         }
     }
 }
@@ -708,6 +768,8 @@ private fun BottomDock(
     bgmEnabled: Boolean,
     onFanToggle: () -> Unit,
     onBgmToggle: () -> Unit,
+    triggersOn: Boolean,
+    onJoystick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier.fillMaxWidth()) {
@@ -720,12 +782,13 @@ private fun BottomDock(
             BottomTab(iconRes = R.drawable.top_indicator_expand, title = "Высокопроизвод", selected = false)
         }
         Row(
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 26.dp),
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 26.dp).clip(RoundedCornerShape(20.dp)).background(Color(0xFF15171B).copy(alpha = .72f)).border(1.dp, Color.White.copy(.20f), RoundedCornerShape(20.dp)).padding(horizontal = 12.dp, vertical = 7.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             RoundDockButton(iconRes = if (fanEnabled) R.drawable.cooling_fan_on else R.drawable.cooling_fan_off, onClick = onFanToggle)
             RoundDockButton(iconRes = if (bgmEnabled) R.drawable.bgm_on else R.drawable.bgm_off, onClick = onBgmToggle)
+            RoundDockButton(iconRes = if (triggersOn) R.drawable.btn_extern_device_select else R.drawable.btn_extern_device, onClick = onJoystick)
         }
     }
 }
@@ -1296,5 +1359,208 @@ private class ReactorView(context: Context) : View(context) {
         strokePaint.color = android.graphics.Color.argb(130, 38, 49, 58)
         strokePaint.strokeWidth = r * 0.022f
         canvas.drawCircle(cx, cy, ri * 0.98f, strokePaint)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Hardware trigger mapping UI (joystick dock button + settings panel + overlay).
+// ---------------------------------------------------------------------------
+
+/** Lets TriggerOverlayService ask the activity to reopen the trigger panel after a save. */
+object TriggerBridge {
+    var requestPkg by mutableStateOf<String?>(null)
+
+    fun request(pkg: String) {
+        requestPkg = pkg
+    }
+
+    fun consume() {
+        requestPkg = null
+    }
+}
+
+/** Launches the game and the calibration overlay on top of it. */
+private fun startTriggerCalibration(context: Context, pkg: String, left: Boolean, right: Boolean) {
+    val launchIntent = context.packageManager.getLaunchIntentForPackage(pkg)
+    if (launchIntent != null) {
+        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(launchIntent)
+    }
+    val serviceIntent = Intent(context, TriggerOverlayService::class.java).apply {
+        putExtra(TriggerOverlayService.EXTRA_PKG, pkg)
+        putExtra(TriggerOverlayService.EXTRA_LEFT, left)
+        putExtra(TriggerOverlayService.EXTRA_RIGHT, right)
+    }
+    try {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            context.startForegroundService(serviceIntent)
+        } else {
+            context.startService(serviceIntent)
+        }
+    } catch (e: Throwable) {
+    }
+}
+
+@Composable
+private fun TriggerSettingsSheet(
+    game: GameCard,
+    onClose: () -> Unit,
+    onCalibrate: (Boolean, Boolean) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    var leftOn by remember(game.packageName) { mutableStateOf(false) }
+    var rightOn by remember(game.packageName) { mutableStateOf(false) }
+    var saved by remember(game.packageName) { mutableStateOf(MoraTriggers.Triggers.NONE) }
+    var visible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) { visible = true }
+    LaunchedEffect(game.packageName) {
+        val t = withContext(Dispatchers.IO) { MoraTriggers.read(game.packageName) }
+        saved = t
+        leftOn = t.left.enabled
+        rightOn = t.right.enabled
+    }
+    val p by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+        label = "triggerSheet",
+    )
+
+    BackHandler { onClose() }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.55f * p))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) { onClose() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier
+                .width(430.dp)
+                .graphicsLayer {
+                    alpha = p
+                    scaleX = 0.96f + 0.04f * p
+                    scaleY = 0.96f + 0.04f * p
+                }
+                .clip(RoundedCornerShape(22.dp))
+                .background(Brush.verticalGradient(listOf(Color(0xFF181B22), Color(0xFF0E1014))))
+                .border(1.dp, Color.White.copy(.08f), RoundedCornerShape(22.dp))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) {}
+                .padding(26.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Image(
+                    painterResource(R.drawable.btn_extern_device_select),
+                    contentDescription = null,
+                    modifier = Modifier.size(34.dp),
+                    contentScale = ContentScale.Fit,
+                )
+                Text(
+                    "Триггеры · ${game.title}",
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            TriggerToggleRow("Левый триггер (Л)", leftOn) { leftOn = it }
+            TriggerToggleRow("Правый триггер (П)", rightOn) { rightOn = it }
+            Text(
+                "Включите сторону и зад��йте координату — точку под кнопкой в игре, куда триггер будет нажимать.",
+                color = Color.White.copy(.6f),
+                fontSize = 13.sp,
+            )
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(52.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFF701D1F), Color(0xFFA33136), Color(0xFF631719)),
+                            ),
+                        )
+                        .border(1.dp, Color(0xFFFF604A), RoundedCornerShape(10.dp))
+                        .clickable(enabled = leftOn || rightOn) { onCalibrate(leftOn, rightOn) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        "Настроить координаты",
+                        color = if (leftOn || rightOn) Color.White else Color.White.copy(.4f),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                    )
+                }
+                Box(
+                    Modifier
+                        .size(58.dp)
+                        .clickable {
+                            val newTriggers = MoraTriggers.Triggers(
+                                MoraTriggers.Side(leftOn, saved.left.x, saved.left.y),
+                                MoraTriggers.Side(rightOn, saved.right.x, saved.right.y),
+                            )
+                            scope.launch {
+                                withContext(Dispatchers.IO) {
+                                    MoraTriggers.write(game.packageName, newTriggers)
+                                }
+                            }
+                            onClose()
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Image(
+                        painterResource(R.drawable.range_line_h_select),
+                        contentDescription = null,
+                        modifier = Modifier.size(58.dp),
+                        contentScale = ContentScale.Fit,
+                    )
+                    Image(
+                        painterResource(R.drawable.tgk_link_ring),
+                        contentDescription = null,
+                        modifier = Modifier.size(34.dp),
+                        contentScale = ContentScale.Fit,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TriggerToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            label,
+            color = Color.White,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.weight(1f),
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = Color(0xFFC22A30),
+                checkedBorderColor = Color(0xFFFF5A4A),
+            ),
+        )
     }
 }

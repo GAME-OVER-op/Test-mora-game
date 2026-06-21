@@ -34,4 +34,14 @@ for NODE in \
   [ -e "$NODE" ] && chmod 0644 "$NODE" 2>/dev/null && echo "[*] chmod 0644 $NODE"
 done
 
+# Make the current user's avatar readable so the HUD can show it (fallback: rm_logo).
+# /data/system needs traverse (o+x) for a non-system app to reach the file.
+PHOTO="/data/system/users/0/photo.png"
+if [ -e "$PHOTO" ]; then
+  chmod o+x /data/system /data/system/users /data/system/users/0 2>/dev/null
+  chmod 0644 "$PHOTO" 2>/dev/null && echo "[*] chmod 0644 $PHOTO"
+else
+  echo "[i] no user avatar at $PHOTO (app will use rm_logo)"
+fi
+
 echo "[+] done. Reboot is NOT required; re-run after each reboot until sepolicy.rule is installed."
