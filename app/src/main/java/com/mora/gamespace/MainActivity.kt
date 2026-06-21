@@ -8,6 +8,9 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import android.media.MediaPlayer
 import android.net.Uri
+import org.videolan.libvlc.LibVLC
+import org.videolan.libvlc.Media
+import org.videolan.libvlc.MediaPlayer as VlcMediaPlayer
 import android.graphics.BitmapFactory
 import java.io.File
 import java.io.FileOutputStream
@@ -21,6 +24,9 @@ import android.view.WindowInsetsController
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.Lifecycle
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -186,45 +192,92 @@ private fun GameSpaceRoot() {
     }
 }
 
-private class MusicController {
-    var player: MediaPlayer? = null
+private class VlcMusicController {
+    var libVlc: LibVLC? = null
+    var player: VlcMediaPlayer? = null
 }
 
 @Composable
 private fun BackgroundMusic(enabled: Boolean) {
     val context = LocalContext.current
-    val controller = remember { MusicController() }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val controller = remember { VlcMusicController() }
 
-    // Background music now uses the platform MediaPlayer so the app does not
-    // depend on the external libVLC artifact during release builds.
+    // Background music plays through the VLC engine (libVLC) with its own FFmpeg-based decoders,
+    // independent of the device's system codecs. Created only when the lobby is ready, fully
+    // torn down on dispose.
     DisposableEffect(enabled) {
         if (!enabled) {
             return@DisposableEffect onDispose { }
         }
-
-        val mp = MediaPlayer.create(context, R.raw.bgm_loop)?.apply {
-            isLooping = true
-            setVolume(0f, 0f)
-            start()
+        val trackFile = File(context.cacheDir, "bgm_loop.m4a")
+        runCatching {
+            if (!trackFile.exists() || trackFile.length() == 0L) {
+                context.resources.openRawResource(R.raw.bgm_loop).use { input ->
+                    FileOutputStream(trackFile).use { output -> input.copyTo(output) }
+                }
+            }
         }
-        controller.player = mp
-
+        runCatching {
+            val vlc = LibVLC(context, arrayListOf("--no-video", "--audio-resampler=soxr"))
+            val mp = VlcMediaPlayer(vlc)
+            val media = Media(vlc, Uri.fromFile(trackFile)).apply {
+                addOption(":input-repeat=65535")
+                addOption(":no-video")
+            }
+            mp.media = media
+            media.release()
+            mp.volume = 0 // start silent; faded in by the effect below
+            mp.play()
+            controller.libVlc = vlc
+            controller.player = mp
+        }
         onDispose {
+            val mp = controller.player
+            val vlc = controller.libVlc
             controller.player = null
+            controller.libVlc = null
             runCatching { mp?.stop() }
             runCatching { mp?.release() }
+            runCatching { vlc?.release() }
         }
     }
 
-    LaunchedEffect(enabled) {
-        val mp = controller.player ?: return@LaunchedEffect
-        var v = 0f
-        while (v < 1f) {
-            runCatching { mp.setVolume(v, v) }
-            delay(26)
-            v += 0.1f
+    var inForeground by remember { mutableStateOf(true) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> inForeground = true
+                Lifecycle.Event.ON_STOP -> inForeground = false
+                else -> {}
+            }
         }
-        runCatching { mp.setVolume(1f, 1f) }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Smoothly fade in on foreground, fade out + pause when the app is hidden to background.
+    LaunchedEffect(enabled, inForeground) {
+        val mp = controller.player ?: return@LaunchedEffect
+        if (inForeground) {
+            runCatching { if (!mp.isPlaying) mp.play() }
+            var v = 0
+            while (v < 100) {
+                runCatching { mp.volume = v }
+                delay(26)
+                v += 10
+            }
+            runCatching { mp.volume = 100 }
+        } else {
+            var v = 100
+            while (v > 0) {
+                runCatching { mp.volume = v }
+                delay(40)
+                v -= 8
+            }
+            runCatching { mp.volume = 0 }
+            runCatching { mp.pause() }
+        }
     }
 }
 
