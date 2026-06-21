@@ -38,10 +38,9 @@
             android:theme="@style/Theme.GameSpace">
             <!-- No LAUNCHER category on purpose: the app has NO launcher icon
                  (RedMagic GameSpace style). It is started explicitly by the
-                 perf_daemon when the side slider is flipped ON:
-                   am start --user 0 -n com.mora.gamespace/.MainActivity
-                 and force-stopped when flipped OFF. exported=true keeps the
-                 explicit component start working without a launcher entry. -->
+                 perf_daemon (am start with an explicit component) when the side
+                 slider is flipped ON, and force-stopped when flipped OFF.
+                 exported=true keeps explicit component start working. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
             </intent-filter>
