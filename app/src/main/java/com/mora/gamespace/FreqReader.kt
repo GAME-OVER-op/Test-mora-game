@@ -16,6 +16,9 @@ object FreqReader {
     const val GPU_CUR_MTK = "/sys/devices/platform/soc/soc:mm/23100000.gpu/devfreq/23100000.gpu/cur_freq"
     const val GPU_MAX_MTK = "/sys/devices/platform/soc/soc:mm/23100000.gpu/devfreq/23100000.gpu/max_freq"
 
+    const val FAN_LEVEL = "/sys/kernel/fan/fan_speed_level"
+    const val FAN_ENABLE = "/sys/kernel/fan/fan_enable"
+
     fun read(path: String): Long {
         return try {
             BufferedReader(FileReader(path)).use { r ->
@@ -39,4 +42,11 @@ object FreqReader {
     fun cpuMax(): Long { val m = read(CPU_MAX); return if (m > 0) m else 3187200L }
     fun gpuCur(): Long { val v = read(GPU_CUR); return if (v > 0) v else read(GPU_CUR_MTK) }
     fun gpuMax(): Long { var v = read(GPU_MAX); if (v <= 0) v = read(GPU_MAX_MTK); return if (v > 0) v else 1_000_000_000L }
+
+    /** Physical cooler speed level 0..5 (0 when the fan is disabled or unreadable). */
+    fun fanLevel(): Int {
+        if (read(FAN_ENABLE) == 0L) return 0
+        val lvl = read(FAN_LEVEL)
+        return if (lvl < 0) 0 else lvl.toInt().coerceIn(0, 5)
+    }
 }

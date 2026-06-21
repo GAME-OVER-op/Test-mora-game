@@ -1,7 +1,5 @@
 package com.mora.gamespace
 
-import android.animation.ObjectAnimator
-import android.animation.ValueAnimator
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -23,7 +21,6 @@ import android.view.Surface as AndroidSurface
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
-import android.view.animation.LinearInterpolator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -396,7 +393,8 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEn
     var allApps by remember { mutableStateOf<List<InstalledApp>>(emptyList()) }
     var games by remember { mutableStateOf<List<GameCard>>(emptyList()) }
     var selectedIndex by remember { mutableIntStateOf(0) }
-    var fanEnabled by remember { mutableStateOf(true) }
+    var fanEnabled by remember { mutableStateOf(MoraCooler.isOn(context)) }
+    var fanLevel by remember { mutableIntStateOf(0) }
     var showAddGames by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showTriggers by remember { mutableStateOf(false) }
@@ -414,6 +412,13 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEn
     }
 
     LaunchedEffect(Unit) { rebuildGames() }
+
+    LaunchedEffect(fanEnabled) {
+        while (true) {
+            fanLevel = if (fanEnabled) withContext(Dispatchers.IO) { FreqReader.fanLevel() } else 0
+            delay(1200)
+        }
+    }
 
     val selected = games.getOrNull(selectedIndex)
 
@@ -450,7 +455,7 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEn
         )
 
         // Cooling fan sits BEHIND the cards/HUD (drawn first = lowest layer).
-        CoreReactor(Modifier.align(Alignment.Center).size(420.dp), animationsEnabled = animationsEnabled)
+        CoreReactor(Modifier.align(Alignment.Center).size(420.dp), animationsEnabled = animationsEnabled, fanLevel = fanLevel)
         TopHud(Modifier.align(Alignment.TopCenter))
         LeftGameRail(
             games = games,
@@ -478,7 +483,10 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEn
         BottomDock(
             fanEnabled = fanEnabled,
             bgmEnabled = bgmEnabled,
-            onFanToggle = { fanEnabled = !fanEnabled },
+            onFanToggle = {
+                fanEnabled = !fanEnabled
+                MoraCooler.setOn(context, fanEnabled)
+            },
             onBgmToggle = onBgmToggle,
             triggersOn = triggersOn,
             onJoystick = { if (selected != null) showTriggers = true },
@@ -717,12 +725,15 @@ private fun LeftGameRail(
 }
 
 @Composable
-private fun CoreReactor(modifier: Modifier = Modifier, animationsEnabled: Boolean) {
+private fun CoreReactor(modifier: Modifier = Modifier, animationsEnabled: Boolean, fanLevel: Int) {
     Box(modifier, contentAlignment = Alignment.Center) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ReactorView(it) },
-            update = { it.animationsEnabled = animationsEnabled },
+            update = {
+                it.animationsEnabled = animationsEnabled
+                it.fanLevel = fanLevel
+            },
         )
         Box(Modifier.size(138.dp).clip(CircleShape).background(Brush.radialGradient(listOf(Color(0xFF3B0710), Color.Black))).border(3.dp, Color(0xFF26313A), CircleShape), contentAlignment = Alignment.Center) {
             Image(painterResource(R.drawable.rm_logo), contentDescription = null, modifier = Modifier.size(102.dp), contentScale = ContentScale.Fit)
@@ -1272,11 +1283,49 @@ private class ReactorView(context: Context) : View(context) {
         strokeCap = Paint.Cap.ROUND
     }
 
-    private var rotationAnimator: ObjectAnimator? = null
+    // Smoothly-ramped continuous rotation. Target angular velocity comes from the physical
+    // cooler level (0..5); the current velocity eases toward it so the fan winds up and down
+    // like a real one instead of snapping between speeds.
+    private var currentSpeed = 0f      // current angular velocity, deg/sec
+    private var targetSpeed = 0f       // desired angular velocity, deg/sec
+    private var lastFrameNanos = 0L
+    private var frameScheduled = false
+
+    /** Degrees-per-second for each cooler level. Index 0 = stopped. */
+    private val speedForLevel = floatArrayOf(0f, 70f, 150f, 250f, 380f, 540f)
+
+    private val frameCallback = object : android.view.Choreographer.FrameCallback {
+        override fun doFrame(frameTimeNanos: Long) {
+            if (!animationsEnabled) {
+                frameScheduled = false
+                lastFrameNanos = 0L
+                return
+            }
+            if (lastFrameNanos != 0L) {
+                val dt = ((frameTimeNanos - lastFrameNanos) / 1_000_000_000.0).toFloat().coerceIn(0f, 0.1f)
+                val k = 1f - kotlin.math.exp(-dt / 0.6f)
+                currentSpeed += (targetSpeed - currentSpeed) * k
+                var r = rotation + currentSpeed * dt
+                r %= 360f
+                rotation = r
+            }
+            lastFrameNanos = frameTimeNanos
+            android.view.Choreographer.getInstance().postFrameCallback(this)
+        }
+    }
 
     init {
         setLayerType(LAYER_TYPE_HARDWARE, null)
     }
+
+    /** Physical cooler level 0..5; drives the spin speed. */
+    var fanLevel: Int = -1
+        set(value) {
+            val v = value.coerceIn(0, 5)
+            if (field == v) return
+            field = v
+            targetSpeed = speedForLevel[v]
+        }
 
     var animationsEnabled: Boolean = false
         set(value) {
@@ -1296,19 +1345,17 @@ private class ReactorView(context: Context) : View(context) {
     }
 
     private fun startAnimators() {
-        if (rotationAnimator == null) {
-            rotationAnimator = ObjectAnimator.ofFloat(this, View.ROTATION, 0f, 360f).apply {
-                duration = 9_000L
-                interpolator = LinearInterpolator()
-                repeatCount = ValueAnimator.INFINITE
-                repeatMode = ValueAnimator.RESTART
-            }
+        if (!frameScheduled) {
+            frameScheduled = true
+            lastFrameNanos = 0L
+            android.view.Choreographer.getInstance().postFrameCallback(frameCallback)
         }
-        rotationAnimator?.let { if (!it.isStarted) it.start() }
     }
 
     private fun stopAnimators() {
-        rotationAnimator?.cancel()
+        frameScheduled = false
+        android.view.Choreographer.getInstance().removeFrameCallback(frameCallback)
+        currentSpeed = 0f
         rotation = 0f
     }
 

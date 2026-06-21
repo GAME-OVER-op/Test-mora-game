@@ -33,7 +33,9 @@ for NODE in \
   /sys/devices/system/cpu/cpu7/cpufreq/scaling_cur_freq \
   /sys/devices/system/cpu/cpu7/cpufreq/cpuinfo_max_freq \
   /sys/class/kgsl/kgsl-3d0/gpuclk \
-  /sys/class/kgsl/kgsl-3d0/max_gpuclk ; do
+  /sys/class/kgsl/kgsl-3d0/max_gpuclk \
+  /sys/kernel/fan/fan_speed_level \
+  /sys/kernel/fan/fan_enable ; do
   [ -e "$NODE" ] && chmod 0644 "$NODE" 2>/dev/null && echo "[*] chmod 0644 $NODE"
 done
 
