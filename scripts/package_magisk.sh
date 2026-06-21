@@ -4,8 +4,8 @@ set -euo pipefail
 PKG="com.mora.gamespace"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="${OUT_DIR:-$ROOT_DIR/dist}"
-MODULE_DIR="$OUT_DIR/mora_perf_deamon"
-ZIP_NAME="${ZIP_NAME:-mora_perf_deamon.zip}"
+MODULE_DIR="$OUT_DIR/gamespace"
+ZIP_NAME="${ZIP_NAME:-GameSpace-magisk-module.zip}"
 RUST_BIN="${RUST_BIN:-$ROOT_DIR/target/aarch64-linux-android/release/perf_daemon}"
 APK_PATH="${APK_PATH:-}"
 

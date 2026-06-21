@@ -104,7 +104,7 @@ curl -s -H "X-Api-Key: $TOKEN" http://127.0.0.1:1004/api/state
 
 Default config path used by the daemon:
 
-* `/data/adb/modules/mora_perf_deamon/config/config.json`
+* `/data/adb/modules/gamespace/config/config.json`
 
 The daemon hot-reloads the config when the file changes.
 

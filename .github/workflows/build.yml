@@ -1,4 +1,4 @@
-name: Android Build
+name: Build GameSpace Magisk Module
 
 on:
   push:
@@ -7,25 +7,45 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-module:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-      - name: Install Android SDK packages
+
+      - name: Install Android SDK and NDK
         run: |
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "platform-tools" \
+            "ndk;28.2.13676358"
+
       - name: Set up Gradle 9.4.1
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 9.4.1
+
+      - name: Set up Rust target
+        run: rustup target add aarch64-linux-android
+
+      - name: Build Rust daemon
+        run: |
+          export NDK="$ANDROID_HOME/ndk/28.2.13676358"
+          export AR_aarch64_linux_android="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+          export CC_aarch64_linux_android="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang"
+          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android35-clang"
+          cargo build --release --target aarch64-linux-android
+
       - name: Generate fallback release keystore
         run: |
           keytool -genkeypair -v \
@@ -36,12 +56,20 @@ jobs:
             -keyalg RSA \
             -keysize 2048 \
             -validity 10000 \
-            -dname "CN=GameSpace Debug,O=Mora,C=US"
+            -dname "CN=GameSpace Debug,O=GameSpace,C=US"
           echo "GAMESPACE_RELEASE_KEYSTORE=$RUNNER_TEMP/gamespace-release.keystore" >> "$GITHUB_ENV"
-      - name: Build debug and release
-        run: gradle :app:assembleDebug :app:assembleRelease --stacktrace
-      - name: Upload APKs
+
+      - name: Build GameSpace APK
+        run: gradle :app:assembleRelease --stacktrace
+
+      - name: Package Magisk module
+        run: |
+          chmod +x scripts/package_magisk.sh
+          scripts/package_magisk.sh
+
+      - name: Upload Magisk module
         uses: actions/upload-artifact@v4
         with:
-          name: GameSpace-apks
-          path: app/build/outputs/apk/**/*.apk
+          name: GameSpace-magisk-module
+          path: dist/*.zip
+          if-no-files-found: error

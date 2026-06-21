@@ -7,9 +7,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub const CONFIG_PATH: &str = "/data/adb/modules/mora_perf_deamon/config/config.json";
+pub const CONFIG_PATH: &str = "/data/adb/modules/gamespace/config/config.json";
 
-pub const GAMES_PATH: &str = "/data/adb/modules/mora_perf_deamon/config/games.json";
+pub const GAMES_PATH: &str = "/data/adb/modules/gamespace/config/games.json";
 
 
 fn default_true() -> bool { true }
