@@ -782,7 +782,7 @@ private fun BottomDock(
             BottomTab(iconRes = R.drawable.top_indicator_expand, title = "Высокопроизвод", selected = false)
         }
         Row(
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 26.dp).clip(RoundedCornerShape(20.dp)).background(Color(0xFF15171B).copy(alpha = .72f)).border(1.dp, Color.White.copy(.20f), RoundedCornerShape(20.dp)).padding(horizontal = 12.dp, vertical = 7.dp),
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 26.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -1056,7 +1056,7 @@ private fun PerformanceTab(pkg: String) {
         Text("Режим производительности", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Pill("Баланс", mode == NubiaSettings.MODE_BALANCE, accent = ringAccent(NubiaSettings.MODE_BALANCE)) { mode = NubiaSettings.MODE_BALANCE; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_PERF_MODE, pkg, intArrayOf(NubiaSettings.MODE_BALANCE)) } }
-            Pill("Подъём", mode == NubiaSettings.MODE_BOOST, accent = ringAccent(NubiaSettings.MODE_BOOST)) { mode = NubiaSettings.MODE_BOOST; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_PERF_MODE, pkg, intArrayOf(NubiaSettings.MODE_BOOST)) } }
+            Pill("П��дъём", mode == NubiaSettings.MODE_BOOST, accent = ringAccent(NubiaSettings.MODE_BOOST)) { mode = NubiaSettings.MODE_BOOST; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_PERF_MODE, pkg, intArrayOf(NubiaSettings.MODE_BOOST)) } }
             Pill("За пределами", mode == NubiaSettings.MODE_BEYOND, accent = ringAccent(NubiaSettings.MODE_BEYOND)) { mode = NubiaSettings.MODE_BEYOND; scope.launch { applyPerGameInt(context, NubiaSettings.KEY_PERF_MODE, pkg, intArrayOf(NubiaSettings.MODE_BEYOND)) } }
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
@@ -1526,15 +1526,15 @@ private fun TriggerSettingsSheet(
                     contentAlignment = Alignment.Center,
                 ) {
                     Image(
-                        painterResource(R.drawable.range_line_h_select),
+                        painterResource(R.drawable.tgk_link_ring),
                         contentDescription = null,
-                        modifier = Modifier.size(58.dp),
+                        modifier = Modifier.align(Alignment.Center).size(58.dp),
                         contentScale = ContentScale.Fit,
                     )
                     Image(
-                        painterResource(R.drawable.tgk_link_ring),
+                        painterResource(R.drawable.range_line_h_select),
                         contentDescription = null,
-                        modifier = Modifier.size(34.dp),
+                        modifier = Modifier.align(Alignment.Center).size(30.dp),
                         contentScale = ContentScale.Fit,
                     )
                 }

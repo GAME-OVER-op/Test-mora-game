@@ -16,10 +16,12 @@ import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.os.Build
 import android.os.IBinder
+import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.Toast
 import kotlin.math.hypot
 
 /**
@@ -44,6 +46,16 @@ class TriggerOverlayService : Service() {
         val rightEnabled = intent?.getBooleanExtra(EXTRA_RIGHT, false) ?: false
 
         if (pkg.isEmpty() || (!leftEnabled && !rightEnabled)) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            Toast.makeText(
+                this,
+                "Нет разрешения «поверх других окон». Запустите скрипт привилегий.",
+                Toast.LENGTH_LONG,
+            ).show()
             stopSelf()
             return START_NOT_STICKY
         }

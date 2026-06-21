@@ -16,6 +16,9 @@ grant_for() {
   # Allow writing Settings.Global (NubiaperformanceMode, touch keys, game_strengthen_mode_*)
   pm grant "$p" android.permission.WRITE_SECURE_SETTINGS 2>/dev/null
   appops set "$p" WRITE_SETTINGS allow 2>/dev/null
+  # Draw-over-other-apps: required for the trigger calibration overlay window
+  appops set "$p" SYSTEM_ALERT_WINDOW allow 2>/dev/null
+  cmd appops set "$p" android:system_alert_window allow 2>/dev/null
   # Usage access (read foreground game), ignore battery optimisation
   appops set "$p" GET_USAGE_STATS allow 2>/dev/null
   dumpsys deviceidle whitelist +"$p" >/dev/null 2>&1
