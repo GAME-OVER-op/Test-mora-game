@@ -8,7 +8,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Matrix
 import android.graphics.Paint
-import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
 import org.videolan.libvlc.LibVLC
@@ -16,9 +15,6 @@ import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer as VlcMediaPlayer
 import java.io.File
 import java.io.FileOutputStream
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import android.os.BatteryManager
 import android.os.Bundle
 import android.view.TextureView
@@ -28,6 +24,7 @@ import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.animation.LinearInterpolator
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -37,6 +34,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,10 +47,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
@@ -60,15 +62,17 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -78,10 +82,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -113,88 +124,53 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class LaunchStage {
-    IntroVideo,
-    DisposeIntro,
-    PanelEntering,
-    Ready,
-}
-
 @Composable
 private fun GameSpaceRoot() {
-    var launchStage by remember { mutableStateOf(LaunchStage.IntroVideo) }
+    // Simple, smooth transition: the intro video plays fullscreen with sound; when it ends
+    // the lobby panel comes forward (fade + scale up), like before the staged rework.
+    var introFinished by remember { mutableStateOf(false) }
+    var animationsReady by remember { mutableStateOf(false) }
     var bgmEnabled by remember { mutableStateOf(true) }
 
-    // Строгая последовательность, чтобы не было наложения тяжёлых экранов:
-    // 1) только видео;
-    // 2) видео полностью удаляется из Compose/TextureView/MediaPlayer;
-    // 3) только потом создаётся панель;
-    // 4) музыка стартует только после завершения выхода панели.
-    BackgroundMusic(enabled = bgmEnabled && launchStage == LaunchStage.Ready)
+    BackgroundMusic(enabled = bgmEnabled && introFinished)
 
-    LaunchedEffect(launchStage) {
-        when (launchStage) {
-            LaunchStage.DisposeIntro -> {
-                delay(220) // даём TextureView/MediaPlayer полностью освободиться
-                launchStage = LaunchStage.PanelEntering
-            }
-            LaunchStage.PanelEntering -> {
-                delay(920) // длительность выхода панели
-                launchStage = LaunchStage.Ready
-            }
-            else -> Unit
+    LaunchedEffect(introFinished) {
+        if (introFinished) {
+            delay(650) // let the panel finish entering before the fan starts spinning
+            animationsReady = true
         }
     }
 
     val panelAlpha by animateFloatAsState(
-        targetValue = when (launchStage) {
-            LaunchStage.PanelEntering, LaunchStage.Ready -> 1f
-            else -> 0f
-        },
-        animationSpec = tween(860, easing = FastOutSlowInEasing),
+        targetValue = if (introFinished) 1f else 0f,
+        animationSpec = tween(620, easing = FastOutSlowInEasing),
         label = "panelAlpha",
     )
     val panelScale by animateFloatAsState(
-        targetValue = when (launchStage) {
-            LaunchStage.PanelEntering, LaunchStage.Ready -> 1f
-            else -> .92f
-        },
-        animationSpec = tween(860, easing = FastOutSlowInEasing),
+        targetValue = if (introFinished) 1f else 0.92f,
+        animationSpec = tween(620, easing = FastOutSlowInEasing),
         label = "panelScale",
     )
 
     MaterialTheme {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
-            when (launchStage) {
-                LaunchStage.IntroVideo -> {
-                    StartAnimation(
-                        onFinished = {
-                            if (launchStage == LaunchStage.IntroVideo) {
-                                launchStage = LaunchStage.DisposeIntro
-                            }
+            if (!introFinished) {
+                StartAnimation(onFinished = { introFinished = true })
+            } else {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            alpha = panelAlpha
+                            scaleX = panelScale
+                            scaleY = panelScale
                         }
+                ) {
+                    GameLobby(
+                        bgmEnabled = bgmEnabled,
+                        onBgmToggle = { bgmEnabled = !bgmEnabled },
+                        animationsEnabled = animationsReady,
                     )
-                }
-                LaunchStage.DisposeIntro -> {
-                    // намеренно пустой чёрный кадр: intro уже удалён, панель ещё не создана
-                }
-                LaunchStage.PanelEntering,
-                LaunchStage.Ready -> {
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                alpha = panelAlpha
-                                scaleX = panelScale
-                                scaleY = panelScale
-                            }
-                    ) {
-                        GameLobby(
-                            bgmEnabled = bgmEnabled,
-                            onBgmToggle = { bgmEnabled = !bgmEnabled },
-                            animationsEnabled = launchStage == LaunchStage.Ready,
-                        )
-                    }
                 }
             }
         }
@@ -212,9 +188,9 @@ private fun BackgroundMusic(enabled: Boolean) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val controller = remember { VlcMusicController() }
 
-    // Background music plays through the VLC engine (libVLC) with its own FFmpeg-based
-    // decoders, independent of the device's system codecs. Created only when the second
-    // screen is ready, fully torn down on dispose.
+    // Background music plays through the VLC engine (libVLC) with its own FFmpeg-based decoders,
+    // independent of the device's system codecs. Created only when the lobby is ready, fully
+    // torn down on dispose.
     DisposableEffect(enabled) {
         if (!enabled) {
             return@DisposableEffect onDispose { }
@@ -236,7 +212,7 @@ private fun BackgroundMusic(enabled: Boolean) {
             }
             mp.media = media
             media.release()
-            mp.volume = 0 // start silent; LaunchedEffect fades it in
+            mp.volume = 0 // start silent; faded in by the effect below
             mp.play()
             controller.libVlc = vlc
             controller.player = mp
@@ -252,7 +228,6 @@ private fun BackgroundMusic(enabled: Boolean) {
         }
     }
 
-    // Observe app foreground/background.
     var inForeground by remember { mutableStateOf(true) }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -266,7 +241,7 @@ private fun BackgroundMusic(enabled: Boolean) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Smoothly fade music in on foreground and out (then pause) when hidden to background.
+    // Smoothly fade in on foreground, fade out + pause when the app is hidden to background.
     LaunchedEffect(enabled, inForeground) {
         val mp = controller.player ?: return@LaunchedEffect
         if (inForeground) {
@@ -308,12 +283,6 @@ private fun StartAnimation(modifier: Modifier = Modifier, onFinished: () -> Unit
 
                     fun applyCenterCropTransform(viewWidth: Int, viewHeight: Int) {
                         if (viewWidth <= 0 || viewHeight <= 0 || sourceVideoWidth <= 0 || sourceVideoHeight <= 0) return
-
-                        // Correct GameSpace-style usage: keep the original video untouched,
-                        // and center-crop it at render time. This fills the display without
-                        // distorting the frame and without re-encoding the MP4.
-                        // TextureView by default stretches the decoded buffer to the view bounds.
-                        // To get correct center-crop without squashing, scale relative to that default fit.
                         val viewAspect = viewWidth.toFloat() / viewHeight.toFloat()
                         val videoAspect = sourceVideoWidth.toFloat() / sourceVideoHeight.toFloat()
                         val scaleX: Float
@@ -385,24 +354,51 @@ private fun StartAnimation(modifier: Modifier = Modifier, onFinished: () -> Unit
 }
 
 private data class GameCard(
-    val title: String,
     val packageName: String,
-    val imageRes: Int,
-    val lastPlayed: String = "<1h",
-)
-
-private val demoGames = listOf(
-    GameCard("Call of Duty", "com.activision.callofduty.shooter", R.drawable.performance_logo),
-    GameCard("Mobile Legends: Bang Bang", "com.mobile.legends", R.drawable.pure_logo),
-    GameCard("MT Manager", "bin.mt.plus", R.drawable.data_manager, "tool"),
+    val title: String,
+    val icon: ImageBitmap? = null,
+    val fallbackRes: Int? = null,
+    val lastPlayed: String = "",
 )
 
 @Composable
+private fun GameIcon(card: GameCard, modifier: Modifier = Modifier) {
+    val icon = card.icon
+    val fallback = card.fallbackRes
+    if (icon != null) {
+        Image(bitmap = icon, contentDescription = null, modifier = modifier, contentScale = ContentScale.Fit)
+    } else if (fallback != null) {
+        Image(painterResource(fallback), contentDescription = null, modifier = modifier, contentScale = ContentScale.Fit)
+    } else {
+        Box(modifier.background(Color(0xFF1A1D22)))
+    }
+}
+
+@Composable
 private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEnabled: Boolean) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var allApps by remember { mutableStateOf<List<InstalledApp>>(emptyList()) }
+    var games by remember { mutableStateOf<List<GameCard>>(emptyList()) }
     var selectedIndex by remember { mutableIntStateOf(0) }
     var fanEnabled by remember { mutableStateOf(true) }
-    val selected = demoGames[selectedIndex]
-    val context = LocalContext.current
+    var showAddGames by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
+
+    suspend fun rebuildGames() {
+        val apps = withContext(Dispatchers.IO) { InstalledApps.loadUserApps(context) }
+        val pkgs = withContext(Dispatchers.IO) {
+            NubiaSettings.parseStrengthenPackages(RootShell.getGlobal(NubiaSettings.KEY_STRENGTHEN_LIST))
+        }
+        allApps = apps
+        val byPkg = apps.associateBy { it.packageName }
+        games = pkgs.mapNotNull { pkg -> byPkg[pkg]?.let { GameCard(it.packageName, it.label, it.icon) } }
+        if (selectedIndex >= games.size) selectedIndex = 0
+    }
+
+    LaunchedEffect(Unit) { rebuildGames() }
+
+    val selected = games.getOrNull(selectedIndex)
 
     Box(Modifier.fillMaxSize().background(Color(0xFF050506))) {
         Image(
@@ -428,20 +424,23 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEn
         CoreReactor(Modifier.align(Alignment.Center).size(420.dp), animationsEnabled = animationsEnabled)
         TopHud(Modifier.align(Alignment.TopCenter))
         LeftGameRail(
-            games = demoGames,
+            games = games,
             selectedIndex = selectedIndex,
             onSelected = { selectedIndex = it },
+            onAddGames = { showAddGames = true },
             modifier = Modifier.align(Alignment.CenterStart).padding(start = 34.dp, top = 34.dp),
         )
         SelectedGamePanel(
             game = selected,
             onLaunch = {
-                val launchIntent = context.packageManager.getLaunchIntentForPackage(selected.packageName)
+                val pkg = selected?.packageName ?: return@SelectedGamePanel
+                val launchIntent = context.packageManager.getLaunchIntentForPackage(pkg)
                 if (launchIntent != null) {
                     launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     context.startActivity(launchIntent)
                 }
             },
+            onOpenSettings = { if (selected != null) showSettings = true },
             modifier = Modifier.align(Alignment.CenterEnd).padding(end = 34.dp, top = 66.dp),
         )
         BottomDock(
@@ -451,6 +450,30 @@ private fun GameLobby(bgmEnabled: Boolean, onBgmToggle: () -> Unit, animationsEn
             onBgmToggle = onBgmToggle,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp),
         )
+    }
+
+    if (showAddGames) {
+        AddGamesScreen(
+            apps = allApps,
+            initiallySelected = games.map { it.packageName },
+            onClose = { newSelected ->
+                showAddGames = false
+                scope.launch {
+                    withContext(Dispatchers.IO) {
+                        RootShell.putGlobal(
+                            NubiaSettings.KEY_STRENGTHEN_LIST,
+                            NubiaSettings.buildStrengthenList(newSelected),
+                        )
+                    }
+                    rebuildGames()
+                }
+            },
+        )
+    }
+
+    val settingsGame = selected
+    if (showSettings && settingsGame != null) {
+        GameSettingsSheet(game = settingsGame, onClose = { showSettings = false })
     }
 }
 
@@ -486,7 +509,6 @@ private fun rememberHudState(): State<HudState> {
     val context = LocalContext.current
     val state = remember { mutableStateOf(readHudState(context)) }
 
-    // Time update: once per minute is enough for HH:mm and avoids constant second-screen work.
     LaunchedEffect(Unit) {
         while (true) {
             state.value = state.value.copy(time = currentTimeText())
@@ -494,7 +516,6 @@ private fun rememberHudState(): State<HudState> {
         }
     }
 
-    // Battery update: event-driven, no polling/registerReceiver loop.
     DisposableEffect(context) {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(receiverContext: Context, intent: Intent) {
@@ -568,7 +589,13 @@ private fun batteryIconFor(percent: Int): Int = when {
 }
 
 @Composable
-private fun LeftGameRail(games: List<GameCard>, selectedIndex: Int, onSelected: (Int) -> Unit, modifier: Modifier = Modifier) {
+private fun LeftGameRail(
+    games: List<GameCard>,
+    selectedIndex: Int,
+    onSelected: (Int) -> Unit,
+    onAddGames: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(modifier = modifier.width(250.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         games.forEachIndexed { index, game ->
             Row(
@@ -587,21 +614,20 @@ private fun LeftGameRail(games: List<GameCard>, selectedIndex: Int, onSelected: 
                         ),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Image(painterResource(game.imageRes), contentDescription = null, modifier = Modifier.size(48.dp), contentScale = ContentScale.Fit)
+                    GameIcon(game, Modifier.size(48.dp))
                 }
                 Column(Modifier.weight(1f)) {
                     Text(game.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(game.lastPlayed, color = Color.White.copy(.45f), fontSize = 10.sp)
                 }
             }
         }
         Row(
-            modifier = Modifier.height(74.dp).fillMaxWidth(),
+            modifier = Modifier.height(74.dp).fillMaxWidth().clickable { onAddGames() },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(Modifier.size(68.dp).clip(RoundedCornerShape(13.dp)).border(1.dp, Color.White.copy(.18f), RoundedCornerShape(13.dp)), contentAlignment = Alignment.Center) {
-                Text("＋", color = Color.White.copy(.72f), fontSize = 36.sp, fontWeight = FontWeight.Light)
+                Text("\uFF0B", color = Color.White.copy(.72f), fontSize = 36.sp, fontWeight = FontWeight.Light)
             }
             Text("Добавить игры", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
         }
@@ -623,13 +649,18 @@ private fun CoreReactor(modifier: Modifier = Modifier, animationsEnabled: Boolea
 }
 
 @Composable
-private fun SelectedGamePanel(game: GameCard, onLaunch: () -> Unit, modifier: Modifier = Modifier) {
+private fun SelectedGamePanel(
+    game: GameCard?,
+    onLaunch: () -> Unit,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(modifier = modifier.width(292.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Spacer(Modifier.height(116.dp))
-        Text(game.title, color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(game?.title ?: "Добавьте игры", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             RedLaunchButton("Запуск игры", onLaunch)
-            SpeedButton()
+            SpeedButton(onOpenSettings)
         }
     }
 }
@@ -650,8 +681,11 @@ private fun RedLaunchButton(text: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SpeedButton() {
-    Box(Modifier.size(54.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF260507).copy(.72f)).border(1.dp, Color(0xFFFF604A), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+private fun SpeedButton(onClick: () -> Unit) {
+    Box(
+        Modifier.size(54.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF260507).copy(.72f)).border(1.dp, Color(0xFFFF604A), RoundedCornerShape(12.dp)).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
         Image(painterResource(R.drawable.exo_ic_speed), contentDescription = null, modifier = Modifier.size(32.dp), contentScale = ContentScale.Fit)
     }
 }
@@ -720,116 +754,443 @@ private fun RoundDockButton(iconRes: Int, onClick: () -> Unit) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Root-backed settings helpers (off the main thread)
+// ---------------------------------------------------------------------------
+
+private suspend fun applyPerGameInt(key: String, pkg: String, values: IntArray): String = withContext(Dispatchers.IO) {
+    val cur = RootShell.getGlobal(key)
+    RootShell.putGlobal(key, NubiaSettings.buildSaveString(cur, pkg, values))
+}
+
+private suspend fun applyPerGameStr(key: String, pkg: String, value: String): String = withContext(Dispatchers.IO) {
+    val cur = RootShell.getGlobal(key)
+    RootShell.putGlobal(key, NubiaSettings.buildSaveString(cur, pkg, value))
+}
+
+private suspend fun applyGlobalValue(key: String, value: String): String = withContext(Dispatchers.IO) {
+    RootShell.putGlobal(key, value)
+}
+
+private suspend fun readPerGameInt(key: String, pkg: String, def: Int): Int = withContext(Dispatchers.IO) {
+    NubiaSettings.parse(RootShell.getGlobal(key), pkg, intArrayOf(def))[0]
+}
+
+private suspend fun readPerGameStr(key: String, pkg: String, def: String): String = withContext(Dispatchers.IO) {
+    NubiaSettings.parseString(RootShell.getGlobal(key), pkg, def)
+}
+
+private suspend fun readGlobalIntValue(key: String, def: Int): Int = withContext(Dispatchers.IO) {
+    RootShell.getGlobalInt(key, def)
+}
+
+// ---------------------------------------------------------------------------
+// "Добавить игры" screen
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun AddGamesScreen(
+    apps: List<InstalledApp>,
+    initiallySelected: List<String>,
+    onClose: (List<String>) -> Unit,
+) {
+    val selected = remember { mutableStateListOf<String>().apply { addAll(initiallySelected) } }
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+    val p by animateFloatAsState(if (visible) 1f else 0f, tween(320, easing = FastOutSlowInEasing), label = "addgames")
+
+    BackHandler { onClose(selected.toList()) }
+
+    val added = apps.filter { selected.contains(it.packageName) }
+    val notAdded = apps.filter { !selected.contains(it.packageName) }
+
+    Box(Modifier.fillMaxSize().background(Color(0xFF050608)).graphicsLayer { alpha = p }) {
+        Column(Modifier.fillMaxSize().padding(horizontal = 30.dp)) {
+            Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(40.dp).clip(RoundedCornerShape(9.dp)).background(Color.Black.copy(.4f))
+                        .border(1.dp, Color.White.copy(.18f), RoundedCornerShape(9.dp)).clickable { onClose(selected.toList()) },
+                    contentAlignment = Alignment.Center,
+                ) { Text("\u2039", color = Color.White, fontSize = 26.sp) }
+                Spacer(Modifier.width(14.dp))
+                Text("Добавить игры", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.weight(1f))
+                Text("Готово", color = Color(0xFFFF7A66), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { onClose(selected.toList()) })
+            }
+            LazyColumn(Modifier.weight(1f)) {
+                item { SectionHeader("Добавлено (" + added.size + ")") }
+                items(added, key = { it.packageName }) { app ->
+                    AppRow(app, isAdded = true, onAdd = { if (!selected.contains(app.packageName)) selected.add(app.packageName) }, onRemove = { selected.remove(app.packageName) })
+                }
+                item { SectionHeader(notAdded.size.toString() + " не добавлено") }
+                items(notAdded, key = { it.packageName }) { app ->
+                    AppRow(app, isAdded = false, onAdd = { if (!selected.contains(app.packageName)) selected.add(app.packageName) }, onRemove = { selected.remove(app.packageName) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(text: String) {
+    Text(text, color = Color.White.copy(.55f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 18.dp, bottom = 8.dp))
+}
+
+@Composable
+private fun AppRow(app: InstalledApp, isAdded: Boolean, onAdd: () -> Unit, onRemove: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().height(64.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Image(bitmap = app.icon, contentDescription = null, modifier = Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)), contentScale = ContentScale.Fit)
+        Text(app.label, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        Pill(text = "Удалить", active = !isAdded, onClick = onRemove)
+        Spacer(Modifier.width(8.dp))
+        Pill(text = "Добавить", active = isAdded, onClick = onAdd)
+    }
+}
+
+@Composable
+private fun Pill(text: String, active: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (active) Color(0xFF8C1820) else Color(0xFF1A1D22))
+            .border(1.dp, if (active) Color(0xFFFF604A) else Color.White.copy(.16f), RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 9.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, color = if (active) Color.White else Color.White.copy(.74f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Per-game settings sheet (opened by the SpeedButton next to "Запуск игры")
+// ---------------------------------------------------------------------------
+
+private enum class SettingsCategory(val title: String) {
+    Performance("Производительность"),
+    Touch("Настройки экрана"),
+    Display("Цвета"),
+    Network("Сеть"),
+}
+
+@Composable
+private fun GameSettingsSheet(game: GameCard, onClose: () -> Unit) {
+    var category by remember { mutableStateOf(SettingsCategory.Performance) }
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+    val p by animateFloatAsState(if (visible) 1f else 0f, tween(360, easing = FastOutSlowInEasing), label = "sheet")
+
+    BackHandler { onClose() }
+
+    Box(
+        Modifier.fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.55f * p))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onClose() }
+    ) {
+        Box(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.86f)
+                .graphicsLayer { translationY = (1f - p) * size.height }
+                .clip(RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
+                .background(Color(0xFF0C0E12))
+                .border(1.dp, Color.White.copy(.08f), RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp))
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+        ) {
+            Row(Modifier.fillMaxSize()) {
+                Column(
+                    Modifier.width(224.dp).fillMaxHeight().background(Color(0xFF080A0D)).padding(vertical = 22.dp, horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 16.dp)) {
+                        GameIcon(game, Modifier.size(38.dp).clip(RoundedCornerShape(9.dp)))
+                        Text(game.title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    SettingsCategory.values().forEach { cat ->
+                        CategoryItem(cat.title, category == cat) { category = cat }
+                    }
+                }
+                Box(Modifier.weight(1f).fillMaxHeight().padding(28.dp)) {
+                    when (category) {
+                        SettingsCategory.Performance -> PerformanceTab(game.packageName)
+                        SettingsCategory.Touch -> TouchTab(game.packageName)
+                        SettingsCategory.Display -> DisplayTab(game.packageName)
+                        SettingsCategory.Network -> NetworkTab()
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryItem(title: String, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+            .background(if (selected) Color(0xFF1C1F26) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.width(3.dp).height(16.dp).background(if (selected) Color(0xFFFF604A) else Color.Transparent))
+            Spacer(Modifier.width(10.dp))
+            Text(title, color = if (selected) Color.White else Color.White.copy(.66f), fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+        }
+    }
+}
+
+@Composable
+private fun PerformanceTab(pkg: String) {
+    val scope = rememberCoroutineScope()
+    var mode by remember(pkg) { mutableIntStateOf(NubiaSettings.MODE_BALANCE) }
+    var cpuKhz by remember { mutableStateOf(0f) }
+    var gpuHz by remember { mutableStateOf(0f) }
+
+    LaunchedEffect(pkg) { mode = readPerGameInt(NubiaSettings.KEY_PERF_MODE, pkg, NubiaSettings.MODE_BALANCE) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            cpuKhz = withContext(Dispatchers.IO) { FreqReader.cpuCur().toFloat() }
+            gpuHz = withContext(Dispatchers.IO) { FreqReader.gpuCur().toFloat() }
+            delay(1000)
+        }
+    }
+    val cpuAnim by animateFloatAsState(cpuKhz, tween(500), label = "cpuAnim")
+    val gpuAnim by animateFloatAsState(gpuHz, tween(500), label = "gpuAnim")
+
+    Column(verticalArrangement = Arrangement.spacedBy(22.dp)) {
+        Text("Режим производительности", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Pill("Баланс", mode == NubiaSettings.MODE_BALANCE) { mode = NubiaSettings.MODE_BALANCE; scope.launch { applyPerGameInt(NubiaSettings.KEY_PERF_MODE, pkg, intArrayOf(NubiaSettings.MODE_BALANCE)) } }
+            Pill("Подъём", mode == NubiaSettings.MODE_BOOST) { mode = NubiaSettings.MODE_BOOST; scope.launch { applyPerGameInt(NubiaSettings.KEY_PERF_MODE, pkg, intArrayOf(NubiaSettings.MODE_BOOST)) } }
+            Pill("За пределами", mode == NubiaSettings.MODE_BEYOND) { mode = NubiaSettings.MODE_BEYOND; scope.launch { applyPerGameInt(NubiaSettings.KEY_PERF_MODE, pkg, intArrayOf(NubiaSettings.MODE_BEYOND)) } }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(46.dp), verticalAlignment = Alignment.CenterVertically) {
+            PerfRing(mode, true, fmtGhz(cpuAnim), "ГГц", "CPU")
+            PerfRing(mode, false, fmtMhz(gpuAnim), "МГц", "GPU")
+        }
+        Text("Повышение частоты ЦП/ГП для требовательных игр. «За пределами» — максимум.", color = Color.White.copy(.6f), fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun PerfRing(mode: Int, cpu: Boolean, valueText: String, unit: String, label: String) {
+    Box(Modifier.size(156.dp), contentAlignment = Alignment.Center) {
+        Image(painterResource(ringRes(mode, cpu)), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(label, color = Color.White.copy(.7f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text(valueText, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+            Text(unit, color = Color.White.copy(.7f), fontSize = 12.sp)
+        }
+    }
+}
+
+private fun ringRes(mode: Int, cpu: Boolean): Int = when (mode) {
+    NubiaSettings.MODE_BOOST -> if (cpu) R.drawable.rise_cpu else R.drawable.rise_gpu
+    NubiaSettings.MODE_BEYOND -> if (cpu) R.drawable.beyond_cpu else R.drawable.beyond_gpu
+    else -> if (cpu) R.drawable.balance_cpu else R.drawable.balance_gpu
+}
+
+private fun fmtGhz(khz: Float): String = if (khz <= 0f) "--" else String.format(Locale.US, "%.2f", khz / 1_000_000f)
+private fun fmtMhz(hz: Float): String = if (hz <= 0f) "--" else (hz / 1_000_000f).roundToInt().toString()
+
+@Composable
+private fun TouchTab(pkg: String) {
+    val scope = rememberCoroutineScope()
+    var sample by remember(pkg) { mutableIntStateOf(480) }
+    var sen by remember(pkg) { mutableIntStateOf(0) }
+    var follow by remember(pkg) { mutableIntStateOf(0) }
+    var micro by remember(pkg) { mutableIntStateOf(0) }
+
+    LaunchedEffect(pkg) {
+        sample = readPerGameInt(NubiaSettings.KEY_SAMPLE_RATE, pkg, 480)
+        sen = readPerGameInt(NubiaSettings.KEY_SENSITIVE, pkg, 0)
+        follow = readPerGameInt(NubiaSettings.KEY_FOLLOW, pkg, 0)
+        micro = readPerGameInt(NubiaSettings.KEY_MICRO, pkg, 0)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        Text("Частота дискретизации касания", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Pill("Высокая · 480 Гц", sample == 480) { sample = 480; scope.launch { applyPerGameInt(NubiaSettings.KEY_SAMPLE_RATE, pkg, intArrayOf(480)) } }
+            Pill("Сверхвысокая · 960 Гц", sample == 960) { sample = 960; scope.launch { applyPerGameInt(NubiaSettings.KEY_SAMPLE_RATE, pkg, intArrayOf(960)) } }
+        }
+        LevelSlider("Чувствительность касания", sen) { v -> sen = v; scope.launch { applyPerGameInt(NubiaSettings.KEY_SENSITIVE, pkg, intArrayOf(v)) } }
+        LevelSlider("Точность следования", follow) { v -> follow = v; scope.launch { applyPerGameInt(NubiaSettings.KEY_FOLLOW, pkg, intArrayOf(v)) } }
+        LevelSlider("Микро-чувствительность", micro) { v -> micro = v; scope.launch { applyPerGameInt(NubiaSettings.KEY_MICRO, pkg, intArrayOf(v)) } }
+    }
+}
+
+@Composable
+private fun LevelSlider(label: String, level: Int, onLevel: (Int) -> Unit) {
+    var idx by remember(level) { mutableStateOf(levelToIndex(level).toFloat()) }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, color = Color.White.copy(.82f), fontSize = 14.sp)
+        Slider(
+            value = idx,
+            onValueChange = { idx = it },
+            valueRange = 0f..4f,
+            steps = 3,
+            onValueChangeFinished = { onLevel(NubiaSettings.TOUCH_SCREEN_LEVEL[idx.roundToInt().coerceIn(0, 4)]) },
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            for (n in NubiaSettings.TOUCH_SCREEN_LEVEL) {
+                Text(n.toString(), color = Color.White.copy(.5f), fontSize = 11.sp)
+            }
+        }
+    }
+}
+
+private fun levelToIndex(level: Int): Int {
+    val i = NubiaSettings.TOUCH_SCREEN_LEVEL.indexOf(level)
+    return if (i < 0) 2 else i
+}
+
+@Composable
+private fun DisplayTab(pkg: String) {
+    val scope = rememberCoroutineScope()
+    var disp by remember(pkg) { mutableStateOf("default") }
+    LaunchedEffect(pkg) { disp = readPerGameStr(NubiaSettings.KEY_DISPLAY, pkg, "default") }
+    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        Text("Цветовой режим экрана", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Pill("Обычный", disp == "default") { disp = "default"; scope.launch { applyPerGameStr(NubiaSettings.KEY_DISPLAY, pkg, "default") } }
+            Pill("Гонки", disp == "racing") { disp = "racing"; scope.launch { applyPerGameStr(NubiaSettings.KEY_DISPLAY, pkg, "racing") } }
+            Pill("Шутер", disp == "shooting") { disp = "shooting"; scope.launch { applyPerGameStr(NubiaSettings.KEY_DISPLAY, pkg, "shooting") } }
+        }
+        Text("Профиль усиления цвета под жанр игры.", color = Color.White.copy(.6f), fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun NetworkTab() {
+    val scope = rememberCoroutineScope()
+    var wifi by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { wifi = readGlobalIntValue(NubiaSettings.KEY_WIFI_LOW_LATENCY, 0) == 1 }
+    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        Text("Сеть", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("WiFi: режим низкой задержки", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                Text("Глобальный параметр (gsc_wifi_low_latency_mode)", color = Color.White.copy(.55f), fontSize = 12.sp)
+            }
+            Switch(checked = wifi, onCheckedChange = { checked -> wifi = checked; scope.launch { applyGlobalValue(NubiaSettings.KEY_WIFI_LOW_LATENCY, if (checked) "1" else "0") } })
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Cooling fan / reactor (rotation only — 13 tapered blades, drawn UNDER the UI)
+// ---------------------------------------------------------------------------
 
 private class ReactorView(context: Context) : View(context) {
-
-    // The static ring is drawn ONCE into a hardware layer. The visible motion is ONLY a
-    // GPU-driven View.rotation (a fan spins; it does not "breathe", so there is no scale
-    // pulse). onDraw is NOT called every frame, so there is no per-frame CPU cost.
-
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-    private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-    }
-
-    private var rotationAnimator: ObjectAnimator? = null
-
-    init {
-        // Cache this view as a hardware layer so rotation is a pure GPU transform.
-        setLayerType(LAYER_TYPE_HARDWARE, null)
-    }
+    private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val bladePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private var rotationAnimator: ValueAnimator? = null
+    private var angle = 0f
 
     var animationsEnabled: Boolean = false
         set(value) {
-            if (field == value) return
-            field = value
-            if (value) startAnimators() else stopAnimators()
-        }
-
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        if (animationsEnabled) startAnimators()
-    }
-
-    override fun onDetachedFromWindow() {
-        stopAnimators()
-        super.onDetachedFromWindow()
-    }
-
-    private fun startAnimators() {
-        if (rotationAnimator == null) {
-            rotationAnimator = ObjectAnimator.ofFloat(this, View.ROTATION, 0f, 360f).apply {
-                duration = 9_000L // равномерное вращение вентилятора
-                interpolator = LinearInterpolator()
-                repeatCount = ValueAnimator.INFINITE
-                repeatMode = ValueAnimator.RESTART
+            if (field != value) {
+                field = value
+                if (value) startAnimators() else stopAnimators()
             }
         }
-        rotationAnimator?.let { if (!it.isStarted) it.start() }
+
+    init { setLayerType(LAYER_TYPE_HARDWARE, null) }
+
+    private fun startAnimators() {
+        if (rotationAnimator != null) return
+        rotationAnimator = ValueAnimator.ofFloat(0f, 360f).apply {
+            duration = 9000L
+            interpolator = LinearInterpolator()
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.RESTART
+            addUpdateListener { angle = it.animatedValue as Float; invalidate() }
+            start()
+        }
     }
 
     private fun stopAnimators() {
         rotationAnimator?.cancel()
-        rotation = 0f
+        rotationAnimator = null
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        stopAnimators()
     }
 
     override fun onDraw(canvas: android.graphics.Canvas) {
         super.onDraw(canvas)
         val cx = width / 2f
         val cy = height / 2f
-        val r = kotlin.math.min(width, height) / 2f
+        val radius = minOf(cx, cy)
+        if (radius <= 0f) return
 
-        // --- Base disc (this whole view is layered UNDER the surrounding cards) ---
-        fillPaint.shader = null
-        fillPaint.color = android.graphics.Color.argb(150, 9, 11, 15)
-        canvas.drawCircle(cx, cy, r * 0.985f, fillPaint)
-        fillPaint.color = android.graphics.Color.argb(42, 255, 38, 64)
-        canvas.drawCircle(cx, cy, r * 0.80f, fillPaint)
-
-        // --- Outer rim rings ---
-        strokePaint.shader = null
-        strokePaint.color = android.graphics.Color.argb(80, 255, 70, 80)
-        strokePaint.strokeWidth = r * 0.020f
-        canvas.drawCircle(cx, cy, r * 0.965f, strokePaint)
-        strokePaint.color = android.graphics.Color.argb(26, 255, 255, 255)
-        strokePaint.strokeWidth = r * 0.006f
-        canvas.drawCircle(cx, cy, r * 0.905f, strokePaint)
-
-        // --- Fan blades ---
-        val blades = 13
-        val ri = r * 0.34f
-        val ro = r * 0.90f
-        val bladeShader = android.graphics.LinearGradient(
-            cx, cy - ro, cx, cy - ri,
-            android.graphics.Color.argb(185, 74, 82, 92),
-            android.graphics.Color.argb(120, 24, 28, 34),
+        fillPaint.shader = android.graphics.RadialGradient(
+            cx, cy, radius,
+            intArrayOf(0xFF20262E.toInt(), 0xFF12161B.toInt(), 0xFF090B0E.toInt()),
+            floatArrayOf(0f, 0.7f, 1f),
             android.graphics.Shader.TileMode.CLAMP,
         )
-        for (i in 0 until blades) {
-            val deg = i * 360f / blades
+        canvas.drawCircle(cx, cy, radius * 0.94f, fillPaint)
+        fillPaint.shader = null
+
+        strokePaint.color = 0xFF2A333D.toInt()
+        strokePaint.strokeWidth = radius * 0.035f
+        canvas.drawCircle(cx, cy, radius * 0.9f, strokePaint)
+        strokePaint.color = 0x33FF5A4A
+        strokePaint.strokeWidth = radius * 0.012f
+        canvas.drawCircle(cx, cy, radius * 0.82f, strokePaint)
+
+        val bladeCount = 13
+        val hubR = radius * 0.2f
+        val tipR = radius * 0.8f
+        val step = 360f / bladeCount
+        val baseHalf = radius * 0.085f
+        val tipHalf = radius * 0.022f
+        canvas.save()
+        canvas.rotate(angle, cx, cy)
+        for (i in 0 until bladeCount) {
             canvas.save()
-            canvas.rotate(deg, cx, cy)
+            canvas.rotate(step * i, cx, cy)
             val path = android.graphics.Path()
-            // A tapered, slightly swept blade pointing "up" from the hub.
-            path.moveTo(cx - r * 0.040f, cy - ri)
-            path.quadTo(cx - r * 0.235f, cy - r * 0.60f, cx - r * 0.120f, cy - ro)
-            path.quadTo(cx + r * 0.005f, cy - ro - r * 0.028f, cx + r * 0.170f, cy - ro)
-            path.quadTo(cx + r * 0.080f, cy - r * 0.55f, cx + r * 0.050f, cy - ri)
+            path.moveTo(cx - baseHalf, cy - hubR)
+            path.quadTo(cx - tipHalf * 2.2f, cy - (hubR + tipR) * 0.5f, cx - tipHalf, cy - tipR)
+            path.lineTo(cx + tipHalf, cy - tipR)
+            path.quadTo(cx + baseHalf * 1.4f, cy - (hubR + tipR) * 0.5f, cx + baseHalf, cy - hubR)
             path.close()
-            fillPaint.shader = bladeShader
-            canvas.drawPath(path, fillPaint)
-            fillPaint.shader = null
-            // leading-edge red highlight
-            strokePaint.color = android.graphics.Color.argb(70, 255, 116, 120)
-            strokePaint.strokeWidth = r * 0.006f
-            canvas.drawPath(path, strokePaint)
+
+            bladePaint.shader = android.graphics.LinearGradient(
+                cx, cy - hubR, cx, cy - tipR,
+                intArrayOf(0xFF3A444F.toInt(), 0xFF222A32.toInt(), 0xFF161B21.toInt()),
+                floatArrayOf(0f, 0.55f, 1f),
+                android.graphics.Shader.TileMode.CLAMP,
+            )
+            canvas.drawPath(path, bladePaint)
+
+            edgePaint.color = 0x80FF5A4A.toInt()
+            edgePaint.strokeWidth = radius * 0.01f
+            canvas.drawLine(cx + tipHalf, cy - tipR, cx + baseHalf, cy - hubR, edgePaint)
             canvas.restore()
         }
+        bladePaint.shader = null
+        canvas.restore()
 
-        // --- Hub ring (behind the center logo) ---
-        strokePaint.color = android.graphics.Color.argb(130, 38, 49, 58)
-        strokePaint.strokeWidth = r * 0.022f
-        canvas.drawCircle(cx, cy, ri * 0.98f, strokePaint)
+        fillPaint.shader = android.graphics.RadialGradient(
+            cx, cy, hubR * 1.2f,
+            intArrayOf(0xFF49555F.toInt(), 0xFF1A2027.toInt()),
+            null,
+            android.graphics.Shader.TileMode.CLAMP,
+        )
+        canvas.drawCircle(cx, cy, hubR * 1.2f, fillPaint)
+        fillPaint.shader = null
+        strokePaint.color = 0xFF3A4650.toInt()
+        strokePaint.strokeWidth = radius * 0.02f
+        canvas.drawCircle(cx, cy, hubR * 1.2f, strokePaint)
     }
 }
