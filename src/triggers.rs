@@ -591,6 +591,8 @@ fn read_input_event(f: &mut fs::File) -> io::Result<InputEvent> {
 }
 
 fn map_point(px: i32, py: i32, screen_w: i32, screen_h: i32, ranges: &Ranges) -> (i32, i32) {
+    // Legacy identity mapping (capture orientation == panel orientation, no
+    // rotation info). Kept as the fallback path for old configs.
     let sw = screen_w.max(1);
     let sh = screen_h.max(1);
     let den_x = (sw - 1).max(1);
@@ -599,14 +601,63 @@ fn map_point(px: i32, py: i32, screen_w: i32, screen_h: i32, ranges: &Ranges) ->
     let yrng = (ranges.y_max - ranges.y_min).max(1);
     let x = ranges.x_min + (px * xrng) / den_x;
     let y = ranges.y_min + (py * yrng) / den_y;
-    (x, y)
+    (
+        x.clamp(ranges.x_min, ranges.x_max),
+        y.clamp(ranges.y_min, ranges.y_max),
+    )
+}
+
+/// Map a captured display point into the panel-fixed raw touch axes, undoing the
+/// display rotation at capture time.
+///
+/// The raw digitizer axes are panel-fixed (natural/portrait): X spans the short
+/// edge, Y the long edge. The overlay captures pixels in the *current* display
+/// orientation, so we normalise by the capture-surface size and undo the
+/// rotation before scaling into the raw ranges. Without this, a landscape
+/// capture was divided by portrait dims and injected into portrait raw axes,
+/// landing at the wrong spot (and clamping the far side off-screen).
+fn map_side(side: &SideConfig, fb_w: i32, fb_h: i32, ranges: &Ranges) -> (i32, i32) {
+    // No capture frame info -> legacy fb0 portrait scaling.
+    if side.disp_w <= 0 || side.disp_h <= 0 {
+        return map_point(side.x_px, side.y_px, fb_w, fb_h, ranges);
+    }
+
+    let dw = side.disp_w as f64;
+    let dh = side.disp_h as f64;
+    let u = (side.x_px as f64 / (dw - 1.0).max(1.0)).clamp(0.0, 1.0);
+    let v = (side.y_px as f64 / (dh - 1.0).max(1.0)).clamp(0.0, 1.0);
+
+    // Display-normalised (u,v) -> panel-normalised (a,b); a along short edge (X).
+    let (a, b) = match ((side.rot % 4) + 4) % 4 {
+        0 => (u, v),
+        1 => (v, 1.0 - u),
+        2 => (1.0 - u, 1.0 - v),
+        _ => (1.0 - v, u),
+    };
+
+    let xrng = (ranges.x_max - ranges.x_min).max(1) as f64;
+    let yrng = (ranges.y_max - ranges.y_min).max(1) as f64;
+    let x = ranges.x_min + (a * xrng).round() as i32;
+    let y = ranges.y_min + (b * yrng).round() as i32;
+    (
+        x.clamp(ranges.x_min, ranges.x_max),
+        y.clamp(ranges.y_min, ranges.y_max),
+    )
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SideConfig {
     pub enabled: bool,
+    /// Display pixel coordinate captured by the overlay (in the capture
+    /// orientation described by `rot` + `disp_w`/`disp_h`).
     pub x_px: i32,
     pub y_px: i32,
+    /// Display rotation at capture (Surface.ROTATION_*: 0..3).
+    pub rot: i32,
+    /// Capture-surface display size (px) in that orientation. 0 => unknown
+    /// (legacy) -> daemon falls back to fb0 portrait scaling.
+    pub disp_w: i32,
+    pub disp_h: i32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -767,8 +818,8 @@ impl TriggerManager {
             set_system_triggers_enabled(true);
         }
 
-        let (lx, ly) = map_point(cfg.left.x_px, cfg.left.y_px, self.screen_w, self.screen_h, &self.ranges);
-        let (rx, ry) = map_point(cfg.right.x_px, cfg.right.y_px, self.screen_w, self.screen_h, &self.ranges);
+        let (lx, ly) = map_side(&cfg.left, self.screen_w, self.screen_h, &self.ranges);
+        let (rx, ry) = map_side(&cfg.right, self.screen_w, self.screen_h, &self.ranges);
 
         self.inner.left_x.store(lx, Ordering::SeqCst);
         self.inner.left_y.store(ly, Ordering::SeqCst);
@@ -780,9 +831,9 @@ impl TriggerManager {
         self.inner.active.store(true, Ordering::SeqCst);
 
         println!(
-            "TRIGCFG: set left={} px=({}, {}) raw=({}, {}) | right={} px=({}, {}) raw=({}, {})",
-            cfg.left.enabled, cfg.left.x_px, cfg.left.y_px, lx, ly,
-            cfg.right.enabled, cfg.right.x_px, cfg.right.y_px, rx, ry
+            "TRIGCFG: set left={} px=({}, {}) rot={} disp=({}x{}) raw=({}, {}) | right={} px=({}, {}) rot={} disp=({}x{}) raw=({}, {})",
+            cfg.left.enabled, cfg.left.x_px, cfg.left.y_px, cfg.left.rot, cfg.left.disp_w, cfg.left.disp_h, lx, ly,
+            cfg.right.enabled, cfg.right.x_px, cfg.right.y_px, cfg.right.rot, cfg.right.disp_w, cfg.right.disp_h, rx, ry
         );
 
         self.bump_gen();
@@ -996,8 +1047,6 @@ fn spawn_trigger_thread(inner: Arc<Inner>, dev_path: PathBuf, key_code: u16, is_
         println!("TRIG: listen {} (side={} slot={})", dev_path.display(), side, slot);
 
         let mut pressed = false;
-        let mut abs0_seen = false;
-        let mut keyup_seen = false;
         let mut abs_state: Option<bool> = None;
         let mut key_state: Option<bool> = None;
         let mut last_gen = inner.gen.load(Ordering::SeqCst);
@@ -1027,8 +1076,6 @@ fn spawn_trigger_thread(inner: Arc<Inner>, dev_path: PathBuf, key_code: u16, is_
                 }
                 abs_state = None;
                 key_state = None;
-                abs0_seen = false;
-                keyup_seen = false;
                 last_gen = cur_gen;
             }
 
@@ -1045,7 +1092,6 @@ fn spawn_trigger_thread(inner: Arc<Inner>, dev_path: PathBuf, key_code: u16, is_
             if ev.type_ == EV_ABS && ev.code == ABS_DISTANCE {
                 if ev.value == 0 {
                     abs_state = Some(false);
-                    abs0_seen = true;
                     is_release_evt = true;
                 } else {
                     abs_state = Some(true);
@@ -1059,7 +1105,6 @@ fn spawn_trigger_thread(inner: Arc<Inner>, dev_path: PathBuf, key_code: u16, is_
                     is_press_evt = true;
                 } else {
                     key_state = Some(false);
-                    keyup_seen = true;
                     is_release_evt = true;
                 }
             }
@@ -1070,14 +1115,10 @@ fn spawn_trigger_thread(inner: Arc<Inner>, dev_path: PathBuf, key_code: u16, is_
                 }
 
                 pressed = true;
-                abs0_seen = false;
-                keyup_seen = false;
-                if abs_state.is_none() {
-                    abs_state = Some(true);
-                }
-                if key_state.is_none() {
-                    key_state = Some(true);
-                }
+                // Track only the signal(s) this device actually emits. We do NOT
+                // force the missing signal to Some(true): a side that emits only
+                // KEY (or only ABS) must still be able to release. Release is
+                // gated on "no tracked signal is still down" (see below).
 
                 let (x, y) = if is_left {
                     (inner.left_x.load(Ordering::SeqCst), inner.left_y.load(Ordering::SeqCst))
@@ -1098,16 +1139,17 @@ fn spawn_trigger_thread(inner: Arc<Inner>, dev_path: PathBuf, key_code: u16, is_
             }
 
             if pressed && is_release_evt {
-                let do_release =
-                    abs0_seen && keyup_seen && abs_state == Some(false) && key_state == Some(false);
+                // Release once none of the tracked signals is still "down". A
+                // signal the device never emits stays `None`, which does not
+                // block release; this fixes a side (e.g. right) whose sensor
+                // reports only KEY or only ABS getting stuck "pressed" forever.
+                let do_release = abs_state != Some(true) && key_state != Some(true);
                 if do_release {
                     trigger_release(&inner, slot);
                     println!("TRIG: {} UP", side);
                     pressed = false;
                     abs_state = None;
                     key_state = None;
-                    abs0_seen = false;
-                    keyup_seen = false;
                 }
             }
         }

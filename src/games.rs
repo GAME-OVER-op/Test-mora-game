@@ -27,9 +27,18 @@ pub const LIST_PROP: &str = "persist.mora.games";
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TriggerSideConfig {
     pub enabled: bool,
-    /// Pixel coordinates (fb0/virtual_size coordinate system).
+    /// Display pixel coordinate captured by the overlay, in the orientation
+    /// described by `rot`/`dw`/`dh` below.
     pub x: i32,
     pub y: i32,
+    /// Display rotation at capture time (Surface.ROTATION_*: 0..3). The daemon
+    /// uses this plus dw/dh to map the display point into the panel-fixed raw
+    /// touch axes. Legacy values (no rotation info) are stored as 0.
+    pub rot: i32,
+    /// Display width/height (px) of the capture surface in that orientation.
+    /// 0 means "unknown" (legacy) -> daemon falls back to fb0 portrait scaling.
+    pub dw: i32,
+    pub dh: i32,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -90,8 +99,10 @@ fn sanitize_pkg(s: &str) -> String {
         .to_string()
 }
 
-/// Parse one side string `enabled.x.y`. A disabled side may be `0`, `0.0.0`,
-/// or empty.
+/// Parse one side string. Two formats are accepted:
+///   * legacy:  `enabled.x.y`             (rot/dw/dh unknown -> 0)
+///   * current: `enabled.x.y.rot.dw.dh`   (display px + capture frame)
+/// A disabled side may be `0`, `0.0.0`, or empty.
 fn parse_side(s: &str) -> TriggerSideConfig {
     let s = s.trim();
     if s.is_empty() {
@@ -104,10 +115,16 @@ fn parse_side(s: &str) -> TriggerSideConfig {
     }
     let x = it.next().and_then(|v| v.trim().parse::<i32>().ok()).unwrap_or(0);
     let y = it.next().and_then(|v| v.trim().parse::<i32>().ok()).unwrap_or(0);
+    let rot = it.next().and_then(|v| v.trim().parse::<i32>().ok()).unwrap_or(0);
+    let dw = it.next().and_then(|v| v.trim().parse::<i32>().ok()).unwrap_or(0);
+    let dh = it.next().and_then(|v| v.trim().parse::<i32>().ok()).unwrap_or(0);
     TriggerSideConfig {
         enabled: true,
         x: x.max(0),
         y: y.max(0),
+        rot: ((rot % 4) + 4) % 4,
+        dw: dw.max(0),
+        dh: dh.max(0),
     }
 }
 

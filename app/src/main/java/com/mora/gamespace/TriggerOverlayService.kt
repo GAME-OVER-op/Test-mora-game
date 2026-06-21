@@ -345,8 +345,25 @@ private class OverlayView(
     private fun clampY(v: Float): Float = v.coerceIn(0f, height.toFloat())
 
     private fun save() {
-        val left = MoraTriggers.Side(leftEnabled, lx.toInt(), ly.toInt())
-        val right = MoraTriggers.Side(rightEnabled, rx.toInt(), ry.toInt())
+        // Record the capture orientation + surface size alongside the pixels so
+        // the daemon can undo the rotation when mapping into the panel-fixed raw
+        // touch axes (otherwise a landscape capture lands at the wrong spot).
+        val rot = currentRotation()
+        val w = width
+        val h = height
+        val left = MoraTriggers.Side(leftEnabled, lx.toInt(), ly.toInt(), rot, w, h)
+        val right = MoraTriggers.Side(rightEnabled, rx.toInt(), ry.toInt(), rot, w, h)
         onSave?.invoke(MoraTriggers.Triggers(left, right))
+    }
+
+    /** Surface.ROTATION_* of the display this overlay is drawn on (0..3). */
+    private fun currentRotation(): Int = try {
+        val disp = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display else null
+        disp?.rotation
+            ?: @Suppress("DEPRECATION")
+            (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager)
+                .defaultDisplay.rotation
+    } catch (e: Throwable) {
+        0
     }
 }

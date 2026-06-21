@@ -8,10 +8,12 @@ import android.content.Context
  *
  *     persist.mora.g.<package> = <left>;<right>
  *
- * Each side is "<enabled>.<x>.<y>" in RAW screen pixels (the same coordinate space the daemon
- * injects into via the Nubia sar nodes). A disabled side is written as just "0".
- *     enabled side:  "1.540.1200"
- *     disabled side: "0"           (the daemon also tolerates "0.0.0")
+ * Each side is "<enabled>.<x>.<y>.<rot>.<w>.<h>": display pixels captured by the calibration
+ * overlay plus the capture orientation (rot = Surface.ROTATION_*) and surface size (w x h).
+ * The daemon maps that into the panel-fixed raw touch axes, so landscape captures land in the
+ * right spot. A disabled side is written as just "0".
+ *     enabled side:  "1.540.1200.0.1080.2400"
+ *     disabled side: "0"           (daemon also tolerates "0.0.0" and the legacy "1.x.y")
  *
  * left  -> KEY_F7, right -> KEY_F8 (handled by the daemon).
  *
@@ -23,7 +25,22 @@ object MoraTriggers {
 
     const val PROP_PREFIX = "persist.mora.g."
 
-    data class Side(val enabled: Boolean, val x: Int, val y: Int) {
+    /**
+     * A trigger side. `x`/`y` are display pixels captured by the overlay in the
+     * orientation given by `rot` (Surface.ROTATION_*: 0..3) and `w`/`h` (the
+     * capture surface size in that orientation). The daemon uses rot+w+h to map
+     * the point into the panel-fixed raw touch axes, so a coordinate captured in
+     * landscape no longer lands at the wrong place. `w`/`h` of 0 means "unknown"
+     * (legacy data) and the daemon falls back to portrait scaling.
+     */
+    data class Side(
+        val enabled: Boolean,
+        val x: Int,
+        val y: Int,
+        val rot: Int = 0,
+        val w: Int = 0,
+        val h: Int = 0,
+    ) {
         /** A side is only meaningfully placed once it has a non-origin coordinate. */
         val hasCoords: Boolean get() = x > 0 || y > 0
 
@@ -53,8 +70,10 @@ object MoraTriggers {
         return sb.toString()
     }
 
+    // Encoded as "1.x.y.rot.w.h" (display px + capture frame). A disabled or
+    // unplaced side is just "0"; the daemon also tolerates the legacy "1.x.y".
     private fun encodeSide(s: Side): String =
-        if (s.enabled && (s.x != 0 || s.y != 0)) "1.${s.x}.${s.y}" else "0"
+        if (s.enabled && (s.x != 0 || s.y != 0)) "1.${s.x}.${s.y}.${s.rot}.${s.w}.${s.h}" else "0"
 
     fun encode(t: Triggers): String = encodeSide(t.left) + ";" + encodeSide(t.right)
 
@@ -66,7 +85,10 @@ object MoraTriggers {
         val enabled = parts[0] == "1"
         val x = parts[1].toIntOrNull() ?: 0
         val y = parts[2].toIntOrNull() ?: 0
-        return Side(enabled, x, y)
+        val rot = parts.getOrNull(3)?.toIntOrNull() ?: 0
+        val w = parts.getOrNull(4)?.toIntOrNull() ?: 0
+        val h = parts.getOrNull(5)?.toIntOrNull() ?: 0
+        return Side(enabled, x, y, rot, w, h)
     }
 
     fun decode(raw: String?): Triggers {

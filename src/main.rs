@@ -539,11 +539,17 @@ let mut s = shared.write().unwrap();
                             enabled: t.left.enabled,
                             x_px: t.left.x,
                             y_px: t.left.y,
+                            rot: t.left.rot,
+                            disp_w: t.left.dw,
+                            disp_h: t.left.dh,
                         },
                         right: crate::triggers::SideConfig {
                             enabled: t.right.enabled,
                             x_px: t.right.x,
                             y_px: t.right.y,
+                            rot: t.right.rot,
+                            disp_w: t.right.dw,
+                            disp_h: t.right.dh,
                         },
                     })
                     .filter(|c| c.enabled && (c.left.enabled || c.right.enabled));

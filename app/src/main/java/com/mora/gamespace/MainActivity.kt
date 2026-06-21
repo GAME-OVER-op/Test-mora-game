@@ -21,6 +21,7 @@ import android.view.Surface as AndroidSurface
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
+import androidx.core.view.WindowCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -112,6 +113,12 @@ import kotlin.math.roundToInt
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Draw edge-to-edge: extend the window under the (hidden) system bars to
+        // the true display edges. Without this the decor still reserves the
+        // navigation-bar inset even though immersive mode hides the bar, leaving
+        // a dead strip below content (e.g. the app list stopping above the
+        // bottom edge of the screen).
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         enterImmersiveMode()
         setContent { GameSpaceRoot() }
     }
@@ -1592,8 +1599,10 @@ private fun TriggerSettingsSheet(
                         .size(58.dp)
                         .clickable {
                             val newTriggers = MoraTriggers.Triggers(
-                                MoraTriggers.Side(leftOn, saved.left.x, saved.left.y),
-                                MoraTriggers.Side(rightOn, saved.right.x, saved.right.y),
+                                // copy() preserves the calibrated coordinate AND its
+                                // capture frame (rot/w/h); we only flip enabled here.
+                                saved.left.copy(enabled = leftOn),
+                                saved.right.copy(enabled = rightOn),
                             )
                             scope.launch {
                                 withContext(Dispatchers.IO) {
