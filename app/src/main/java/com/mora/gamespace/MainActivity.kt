@@ -830,7 +830,7 @@ private fun AddGamesScreen(
                 Text("Готово", color = Color(0xFFFF7A66), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.clickable { onClose(selected.toList()) })
             }
             LazyColumn(Modifier.weight(1f)) {
-                item { SectionHeader("Добавлено (" + added.size + ")") }
+                item { SectionHeader("Добавл��но (" + added.size + ")") }
                 items(added, key = { it.packageName }) { app ->
                     AppRow(app, isAdded = true, onAdd = { if (!selected.contains(app.packageName)) selected.add(app.packageName) }, onRemove = { selected.remove(app.packageName) })
                 }
@@ -1245,31 +1245,56 @@ private class ReactorView(context: Context) : View(context) {
         val cy = height / 2f
         val r = kotlin.math.min(width, height) / 2f
 
-        fillPaint.color = android.graphics.Color.argb(168, 10, 13, 17)
-        canvas.drawCircle(cx, cy, r, fillPaint)
+        // --- Base disc (this whole view is layered UNDER the surrounding cards) ---
+        fillPaint.shader = null
+        fillPaint.color = android.graphics.Color.argb(150, 9, 11, 15)
+        canvas.drawCircle(cx, cy, r * 0.985f, fillPaint)
+        fillPaint.color = android.graphics.Color.argb(42, 255, 38, 64)
+        canvas.drawCircle(cx, cy, r * 0.80f, fillPaint)
 
-        fillPaint.color = android.graphics.Color.argb(46, 255, 32, 61)
-        canvas.drawCircle(cx, cy, r * .84f, fillPaint)
+        // --- Outer rim rings ---
+        strokePaint.shader = null
+        strokePaint.color = android.graphics.Color.argb(80, 255, 70, 80)
+        strokePaint.strokeWidth = r * 0.020f
+        canvas.drawCircle(cx, cy, r * 0.965f, strokePaint)
+        strokePaint.color = android.graphics.Color.argb(26, 255, 255, 255)
+        strokePaint.strokeWidth = r * 0.006f
+        canvas.drawCircle(cx, cy, r * 0.905f, strokePaint)
 
-        strokePaint.color = android.graphics.Color.argb(36, 255, 75, 82)
-        strokePaint.strokeWidth = 18f
-        canvas.drawCircle(cx, cy, r * .58f, strokePaint)
-
-        for (i in 0 until 48) {
-            val angle = Math.toRadians(i * 360.0 / 48.0)
-            val inner = r * .89f
-            val outer = if (i % 4 == 0) r * .985f else r * .94f
-            strokePaint.color = if (i % 4 == 0) {
-                android.graphics.Color.argb(36, 255, 255, 255)
-            } else {
-                android.graphics.Color.argb(14, 255, 255, 255)
-            }
-            strokePaint.strokeWidth = if (i % 4 == 0) 3f else 1.2f
-            val sx = cx + kotlin.math.cos(angle).toFloat() * inner
-            val sy = cy + kotlin.math.sin(angle).toFloat() * inner
-            val ex = cx + kotlin.math.cos(angle).toFloat() * outer
-            val ey = cy + kotlin.math.sin(angle).toFloat() * outer
-            canvas.drawLine(sx, sy, ex, ey, strokePaint)
+        // --- Fan blades ---
+        val blades = 13
+        val ri = r * 0.34f
+        val ro = r * 0.90f
+        val bladeShader = android.graphics.LinearGradient(
+            cx, cy - ro, cx, cy - ri,
+            android.graphics.Color.argb(185, 74, 82, 92),
+            android.graphics.Color.argb(120, 24, 28, 34),
+            android.graphics.Shader.TileMode.CLAMP,
+        )
+        for (i in 0 until blades) {
+            val deg = i * 360f / blades
+            canvas.save()
+            canvas.rotate(deg, cx, cy)
+            val path = android.graphics.Path()
+            // A tapered, slightly swept blade pointing "up" from the hub.
+            path.moveTo(cx - r * 0.040f, cy - ri)
+            path.quadTo(cx - r * 0.235f, cy - r * 0.60f, cx - r * 0.120f, cy - ro)
+            path.quadTo(cx + r * 0.005f, cy - ro - r * 0.028f, cx + r * 0.170f, cy - ro)
+            path.quadTo(cx + r * 0.080f, cy - r * 0.55f, cx + r * 0.050f, cy - ri)
+            path.close()
+            fillPaint.shader = bladeShader
+            canvas.drawPath(path, fillPaint)
+            fillPaint.shader = null
+            // leading-edge red highlight
+            strokePaint.color = android.graphics.Color.argb(70, 255, 116, 120)
+            strokePaint.strokeWidth = r * 0.006f
+            canvas.drawPath(path, strokePaint)
+            canvas.restore()
         }
+
+        // --- Hub ring (behind the center logo) ---
+        strokePaint.color = android.graphics.Color.argb(130, 38, 49, 58)
+        strokePaint.strokeWidth = r * 0.022f
+        canvas.drawCircle(cx, cy, ri * 0.98f, strokePaint)
     }
 }
