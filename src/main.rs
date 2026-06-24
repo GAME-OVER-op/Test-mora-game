@@ -14,7 +14,7 @@ mod led_props;
 mod led_watch;
 mod mem;
 mod notify;
-mod notifications;
+// mod notifications; // disabled: notification polling service is not used
 mod power;
 mod profiles;
 mod screen;
@@ -86,12 +86,12 @@ fn set_cpu_online(cpu: usize, online: bool, cache_u64: &mut HashMap<PathBuf, u64
 fn battery_saver_disable_delay(override_dur: Duration) -> Duration {
     let s = override_dur.as_secs_f64();
     if s <= 10.0 {
-        Duration::from_secs(5)
+        Duration::from_secs(8)
     } else if s >= 20.0 {
-        Duration::from_secs(30)
+        Duration::from_secs(40)
     } else {
         let t = (s - 10.0) / 10.0;
-        let ms = 5000.0 + t * 25000.0;
+        let ms = 8000.0 + t * 32000.0;
         Duration::from_millis(ms.round() as u64)
     }
 }
@@ -226,7 +226,7 @@ fn main() {
     config_watch::spawn(shared.clone(), cfg_path.clone());
     games_watch::spawn(shared.clone());
     led_watch::spawn(shared.clone());
-    notifications::spawn(shared.clone(), leds.clone());
+    // notifications::spawn(shared.clone(), leds.clone()); // disabled to avoid cmd notification polling
     // Physical side slider -> launch/close GameSpace (RedMagic-style, no icon).
     slider::spawn();
 
@@ -251,10 +251,11 @@ let mut s = shared.write().unwrap();
     }
 
     let mut fan = Fan::new();
-    if fan.is_some() {
+    if let Some(f) = fan.as_mut() {
         let en = sysfs::read_u64(Path::new(FAN_ENABLE)).unwrap_or(0);
         let lv = sysfs::read_u64(Path::new(FAN_LEVEL)).unwrap_or(0);
         println!("FAN: sysfs ok (en={} lvl={})", en, lv);
+        f.clear_stale_boot_state();
     } else {
         println!("FAN: sysfs not found (skip)");
     }
@@ -270,6 +271,10 @@ let mut s = shared.write().unwrap();
             None
         }
     };
+    // The stock settings app restores persisted fan/trigger state on boot. For a
+    // short boot window, keep forcing the stock trigger layer off unless the
+    // current foreground game actually needs it.
+    let boot_realtime_cleanup_until = Instant::now() + Duration::from_secs(90);
 
     let gpu_busy_percent_path = {
         let p = PathBuf::from(GPU_BUSY_PERCENT);
@@ -389,17 +394,17 @@ let mut s = shared.write().unwrap();
     // If battery percent is unknown, use 10s.
     let chg_check_every = |pct: Option<u8>| -> Duration {
         match pct {
-            Some(p) if p > 80 => Duration::from_secs(30),
-            Some(p) if p > 50 => Duration::from_secs(20),
-            Some(_) => Duration::from_secs(10),
-            None => Duration::from_secs(20),
+            Some(p) if p > 80 => Duration::from_secs(45),
+            Some(p) if p > 50 => Duration::from_secs(35),
+            Some(_) => Duration::from_secs(15),
+            None => Duration::from_secs(30),
         }
     };
 
     let mut battery_percent: Option<u8> = charge_probe.as_ref().and_then(|p| p.battery_percent());
     let mut last_batt_check = Instant::now();
     // Battery percent is slow-changing; read once at startup, then poll every 5 minutes.
-    let batt_check_every = Duration::from_secs(5 * 60);
+    let batt_check_every = Duration::from_secs(8 * 60);
 
     let mut game_mode = false;
     // System performance mode read from Settings.Global NubiaperformanceMode.
@@ -419,7 +424,7 @@ let mut s = shared.write().unwrap();
     // the cooler off in the app stops the fan promptly (even with the screen
     // off), instead of waiting up to GAME_CHECK_EVERY seconds and only on-screen.
     let mut last_fan_poll = Instant::now();
-    let fan_poll_every = Duration::from_secs(2);
+    let fan_poll_every = Duration::from_secs(10);
     let mut last_game_pkg: Option<String> = None;
     // Split-charge per-game config removed; keep a dormant default so the controller stays idle.
     let game_split_charge_cfg = crate::games::SplitChargeConfig::default();
@@ -432,7 +437,7 @@ let mut s = shared.write().unwrap();
     let mut last_loop = Instant::now();
     let mut stable_for = Duration::ZERO;
     let mut last_stat_log = Instant::now() - Duration::from_secs(3600);
-    let stat_log_every = Duration::from_secs(60);
+    let stat_log_every = Duration::from_secs(80);
 
     // Cache config and only clone when it changes (config_watch bumps config_rev).
     let mut cfg_cache = { shared.read().unwrap().config.clone() };
@@ -563,6 +568,8 @@ let mut s = shared.write().unwrap();
                         None => mgr.disable(),
                     }
                     last_triggers_cfg = desired_trig;
+                } else if desired_trig.is_none() && now < boot_realtime_cleanup_until {
+                    mgr.force_system_disable();
                 }
 
                 let (active, l, r) = match last_triggers_cfg {
@@ -782,7 +789,7 @@ let mut s = shared.write().unwrap();
             if !bs_override {
                 if base_util >= 90 {
                     bs_high_streak += dt;
-                    if bs_high_streak >= Duration::from_secs(15) {
+                    if bs_high_streak >= Duration::from_secs(25) {
                         bs_override = true;
                         bs_override_since = Some(now);
                         bs_reapply_at = None;
@@ -1014,22 +1021,22 @@ let mut s = shared.write().unwrap();
         if any_write || any_step { stable_for = Duration::ZERO; } else { stable_for += dt; }
 
         let sleep_ms = match zone {
-            TempZone::B56 | TempZone::B57 | TempZone::B58 => 450,
+            TempZone::B56 | TempZone::B57 | TempZone::B58 => 5000,
             _ => {
                 if idle_mode {
                     15000
                 } else if any_write || any_step {
                     750
                 } else if game_mode || charging_effective {
-                    if stable_for >= Duration::from_secs(30) { 3000 } else { 1500 }
+                    if stable_for >= Duration::from_secs(30) { 4000 } else { 4000 }
                 } else if !screen_on {
                     12000
                 } else if stable_for >= Duration::from_secs(60) {
-                    8000
+                    10000
                 } else if stable_for >= Duration::from_secs(30) {
-                    5000
+                    6000
                 } else {
-                    2000
+                    4000
                 }
             }
         };

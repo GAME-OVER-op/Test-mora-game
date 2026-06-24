@@ -117,7 +117,7 @@ const TRIGGER_ENABLE_SETTING: &str = "nubia_parts_trigger_enable";
 const TRIGGER_LEFT_MODE_PATH: &str = "/proc/nubia_key/sar0/mode_operation";
 const TRIGGER_RIGHT_MODE_PATH: &str = "/proc/nubia_key/sar1/mode_operation";
 const TRIGGER_MODE_ON: &str = "1";
-const TRIGGER_MODE_OFF: &str = "0";
+const TRIGGER_MODE_OFF: &str = "2";
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -782,13 +782,19 @@ impl TriggerManager {
             touch_grab_fd: AtomicI32::new(-1),
         });
 
+        // BootReceiver from the stock settings app restores the last persisted
+        // trigger state on boot. Mora is per-game, so start from a clean real-time
+        // baseline and enable the system trigger layer only when set_config() says
+        // the foreground game needs it.
+        set_system_triggers_enabled(false);
+
         // Forwarder: grab the real touchscreen and merge its finger frames into the
         // virtual device. Without it, merging is impossible -> keep triggers off.
         match &touch {
             Some(t) => {
                 spawn_forwarder(inner.clone(), t.devnode.clone(), ranges.slot_max);
                 // Give the forwarder a moment to grab before listeners go live.
-                thread::sleep(Duration::from_millis(150));
+                thread::sleep(Duration::from_millis(200));
                 spawn_trigger_thread(inner.clone(), left.devnode, KEY_F7, true, slot_l);
                 spawn_trigger_thread(inner.clone(), right.devnode, KEY_F8, false, slot_r);
             }
@@ -853,9 +859,8 @@ impl TriggerManager {
         self.inner.active.store(false, Ordering::SeqCst);
         self.inner.left_enabled.store(false, Ordering::SeqCst);
         self.inner.right_enabled.store(false, Ordering::SeqCst);
-        if self.inner.system_enabled.swap(false, Ordering::SeqCst) {
-            set_system_triggers_enabled(false);
-        }
+        self.inner.system_enabled.store(false, Ordering::SeqCst);
+        set_system_triggers_enabled(false);
 
         {
             let mut uif = self.inner.uif.lock().unwrap();
@@ -869,6 +874,15 @@ impl TriggerManager {
         self.bump_gen();
     }
 
+    /// Force the stock trigger layer off even if Mora's internal flag already
+    /// says it is off. This catches BootReceiver / Settings restoring an old
+    /// persisted trigger state after Mora has started.
+    pub fn force_system_disable(&self) {
+        self.disable();
+        self.inner.system_enabled.store(false, Ordering::SeqCst);
+        set_system_triggers_enabled(false);
+    }
+
     fn bump_gen(&self) {
         self.inner.gen.fetch_add(1, Ordering::SeqCst);
     }
@@ -877,9 +891,8 @@ impl TriggerManager {
 impl Drop for TriggerManager {
     fn drop(&mut self) {
         self.inner.stop.store(true, Ordering::SeqCst);
-        if self.inner.system_enabled.swap(false, Ordering::SeqCst) {
-            set_system_triggers_enabled(false);
-        }
+        self.inner.system_enabled.store(false, Ordering::SeqCst);
+        set_system_triggers_enabled(false);
 
         // Restore native touch FIRST: ungrab the real touchscreen so the user keeps
         // working touch even if the forwarder thread is still blocked in read().

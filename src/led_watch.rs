@@ -15,7 +15,7 @@ pub fn spawn(shared: Arc<RwLock<SharedState>>) {
     thread::spawn(move || {
         let mut last = led_props::read_all_raw();
         loop {
-            thread::sleep(Duration::from_secs(8));
+            thread::sleep(Duration::from_secs(15));
 
             let raw = led_props::read_all_raw();
             if raw == last {

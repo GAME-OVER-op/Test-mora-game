@@ -248,7 +248,7 @@ pub fn spawn(shared: Arc<RwLock<SharedState>>, leds: Arc<Leds>) {
 
             // Poll interval: `cmd notification list` is expensive. Keep this slow;
             // users who enable the feature trade LED reaction speed for lower CPU.
-            thread::sleep(Duration::from_secs(20));
+            thread::sleep(Duration::from_secs(30));
         }
     });
 }

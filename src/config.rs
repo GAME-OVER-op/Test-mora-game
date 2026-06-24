@@ -60,18 +60,18 @@ pub const GPU_FREQS: &[u64] = &[
 ];
 
 // Loops / timings
-pub const ENFORCE_ACTIVE: u64 = 6;
-pub const ENFORCE_IDLE: u64 = 18;
+pub const ENFORCE_ACTIVE: u64 = 10;
+pub const ENFORCE_IDLE: u64 = 30;
 // Reduce wakeups/`cmd` calls to keep CPU usage low.
 // Charging probe interval is adaptive (see main.rs), so there's no single constant here.
-pub const GAME_CHECK_EVERY: u64 = 5;
+pub const GAME_CHECK_EVERY: u64 = 8;
 
 // Suspicious background proc scan
 pub const BG_CPU_THRESHOLD_PCT: u8 = 15;
 pub const LONG_OFF_NOTIFY_SECS: u64 = 30;
 
 // Idle condition thresholds
-pub const IDLE_ENTER_SECS: u64 = 10;
+pub const IDLE_ENTER_SECS: u64 = 20;
 pub const IDLE_CPU_MAX: u8 = 15;
 pub const IDLE_GPU_MAX: u8 = 10;
 

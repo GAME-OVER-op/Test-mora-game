@@ -19,7 +19,7 @@ pub fn spawn(shared: Arc<RwLock<SharedState>>) {
         let mut last_driver = { shared.read().unwrap().games.driver_string.clone() };
 
         loop {
-            thread::sleep(Duration::from_secs(15));
+            thread::sleep(Duration::from_secs(30));
 
             let rt = load_from_props();
             let driver = rt.driver_string.clone();

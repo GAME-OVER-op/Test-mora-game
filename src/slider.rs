@@ -188,7 +188,7 @@ pub fn spawn() {
                 Ok(e) => e,
                 Err(e) => {
                     eprintln!("SLIDER: read error: {} -- reopening", e);
-                    thread::sleep(Duration::from_millis(500));
+                    thread::sleep(Duration::from_secs(1));
                     match fs::File::open(&dev) {
                         Ok(x) => {
                             f = x;

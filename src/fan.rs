@@ -15,25 +15,39 @@ impl Fan {
         self.level
     }
 
-fn set_nubia_parts_fan_enable(enable: bool) {
-    let val = if enable { "1" } else { "0" };
+fn put_global_int(name: &str, value: u8) {
+    let val = value.to_string();
 
     // Try direct call first (daemon often runs as root).
     let st = Command::new("settings")
-        .args(["put", "global", "nubia_parts_fan_enable", val])
+        .args(["put", "global", name, &val])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status();
 
     if st.is_err() || !st.as_ref().ok().map(|x| x.success()).unwrap_or(false) {
         // Fallback via shell.
-        let cmd = format!("settings put global nubia_parts_fan_enable {}", val);
+        let cmd = format!("settings put global {} {}", name, val);
         let _ = Command::new("/system/bin/sh")
             .args(["-c", &cmd])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status();
     }
+}
+
+fn set_nubia_parts_fan_enable(enable: bool) {
+    Self::put_global_int("nubia_parts_fan_enable", if enable { 1 } else { 0 });
+}
+
+fn set_nubia_parts_fan_speed_level(level: u8) {
+    Self::put_global_int("nubia_parts_fan_speed_level", level.min(5));
+}
+
+fn sync_nubia_parts_fan_state(level: u8) {
+    let lvl = level.min(5);
+    Self::set_nubia_parts_fan_enable(lvl != 0);
+    Self::set_nubia_parts_fan_speed_level(lvl);
 }
     pub fn new() -> Option<Self> {
         let enable_path = PathBuf::from(config::FAN_ENABLE);
@@ -47,6 +61,32 @@ fn set_nubia_parts_fan_enable(enable: bool) {
 
     pub fn sysfs_ok() -> bool {
         Path::new(config::FAN_ENABLE).exists() && Path::new(config::FAN_LEVEL).exists()
+    }
+
+    /// Clear stale fan state restored by the stock settings app at boot.
+    ///
+    /// Mora then re-applies the correct level from current temperatures / charging /
+    /// game state in the main loop, instead of inheriting the level that happened
+    /// to be saved before reboot.
+    pub fn clear_stale_boot_state(&mut self) {
+        self.level = 0;
+        let _ = std::fs::write(&self.enable_path, b"0
+");
+        let _ = std::fs::write(&self.level_path, b"0
+");
+        Self::sync_nubia_parts_fan_state(0);
+        println!("FAN: cleared stale boot state");
+    }
+
+    fn ensure_current_level_applied(&self, cache: &mut HashMap<PathBuf, u64>) {
+        let lvl = self.level.min(5) as u64;
+        let en = if lvl == 0 { 0 } else { 1 };
+        let wrote_en = sysfs::write_u64_if_needed(&self.enable_path, en, cache, true).unwrap_or(false);
+        let wrote_lvl = sysfs::write_u64_if_needed(&self.level_path, lvl, cache, true).unwrap_or(false);
+        if wrote_en || wrote_lvl {
+            Self::sync_nubia_parts_fan_state(self.level);
+            println!("FAN: re-synced external state to {}", self.level);
+        }
     }
 
     // SoC curve (fan temps -10°C already built into thresholds externally, keep same curve)
@@ -70,13 +110,13 @@ fn set_nubia_parts_fan_enable(enable: bool) {
     }
 
     pub fn force_level(&mut self, cache: &mut HashMap<PathBuf, u64>, level: u8) {
-        let prev = self.level;
         let lvl = level.min(5);
         self.level = lvl;
 
         if self.level == 0 {
             let _ = sysfs::write_u64_if_needed(&self.enable_path, 0, cache, true);
-            if prev != 0 { Self::set_nubia_parts_fan_enable(false); }
+            let _ = sysfs::write_u64_if_needed(&self.level_path, 0, cache, true);
+            Self::sync_nubia_parts_fan_state(0);
             println!("FAN: off");
             return;
         }
@@ -85,7 +125,7 @@ fn set_nubia_parts_fan_enable(enable: bool) {
         let _ = sysfs::write_u64_if_needed(&self.enable_path, 1, cache, true);
         let _ = sysfs::write_u64_if_needed(&self.level_path, v, cache, true);
         let _ = sysfs::write_u64_if_needed(&self.enable_path, 1, cache, true);
-        if prev == 0 && self.level != 0 { Self::set_nubia_parts_fan_enable(true); }
+        Self::sync_nubia_parts_fan_state(self.level);
         println!("FAN: {}", self.level);
     }
 
@@ -99,7 +139,6 @@ fn set_nubia_parts_fan_enable(enable: bool) {
         game_mode: bool,
         game_fan_min_level: u8,
     ) {
-        let prev = self.level;
         let soc_level = if soc_temp_mc >= 0 {
             Self::level_from_soc_temp(soc_temp_mc)
         } else {
@@ -136,12 +175,16 @@ fn set_nubia_parts_fan_enable(enable: bool) {
             self.level
         };
 
-        if next == self.level { return; }
+        if next == self.level {
+            self.ensure_current_level_applied(cache);
+            return;
+        }
         self.level = next;
 
         if self.level == 0 {
             let _ = sysfs::write_u64_if_needed(&self.enable_path, 0, cache, true);
-            if prev != 0 { Self::set_nubia_parts_fan_enable(false); }
+            let _ = sysfs::write_u64_if_needed(&self.level_path, 0, cache, true);
+            Self::sync_nubia_parts_fan_state(0);
             println!("FAN: off");
             return;
         }
@@ -150,7 +193,7 @@ fn set_nubia_parts_fan_enable(enable: bool) {
         let _ = sysfs::write_u64_if_needed(&self.enable_path, 1, cache, true);
         let _ = sysfs::write_u64_if_needed(&self.level_path, lvl, cache, true);
         let _ = sysfs::write_u64_if_needed(&self.enable_path, 1, cache, true);
-        if prev == 0 && self.level != 0 { Self::set_nubia_parts_fan_enable(true); }
+        Self::sync_nubia_parts_fan_state(self.level);
         println!("FAN: {}", self.level);
     }
 }
